@@ -1,0 +1,81 @@
+#!/bin/bash
+# This script looks for recent disk access, and if nothing has changed, puts /dev/disk/by-id/${drive} into spindown mode.
+# This script is copied from: https://forums.unraid.net/topic/92749-script-to-spindown-unassigned-usb-hdds/
+# Set your drive identifiers (listed in /dev/disk/by-id/) ignoring characters after the last "-"
+# e.g. listing: usb-WD_My_Passport_25E2_75831314363630505A37-0:0
+#      becomes: usb-WD_My_Passport_25E2_75831314363630505A37
+drives=(
+  "<DRIVE_IDENTIFIER_1>"
+  "<DRIVE_IDENTIFIER_2>"
+)
+
+# spindown delay in minutes
+SPINDOWN_DELAY=15
+
+# Uncomment to enable debug mode
+DEBUG=true
+
+# Set the directory where the status files will be stored,
+# /tmp/ is a fine default
+STATUS_DIR="/tmp"
+
+current=`date`
+
+# create status_dir if it doesn't exist
+mkdir -p ${STATUS_DIR}
+
+do_device() {
+    local device_id=$1
+    device=`ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4`
+    filename="${STATUS_DIR}/diskaccess-${device_id}.status"
+
+    is_awake=`smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'`
+    if [ "${is_awake}" == "1" ]; then
+        if [ "$DEBUG" = true ]; then
+            echo "${device} is awake"
+        fi
+
+        stat_new=$(grep "${device} " /proc/diskstats | tr -dc "[:digit:]")
+
+        if [ ! -f "${filename}" ]; then
+            echo ${current} "- ${filename} file does not exist; creating it now."
+            echo ${stat_new} > ${filename}
+        else
+            stat_old=`cat ${filename} | tr -dc "[:digit:]"`
+
+            # calculate minutes since last update to see if we should sleep
+            current_time=$(date +%s)
+            last_mod=$(stat ${filename} -c %Y)
+            seconds_ago=$(expr $current_time - $last_mod)
+            minutes_ago=$(expr $seconds_ago / 60)
+
+            if [ "$DEBUG" = true ]; then
+                echo "${device} old stat: ${stat_old}"
+                echo "${device} new stat: ${stat_new}"
+                echo "${device} new stat modified ${minutes_ago} minutes ago"
+            fi
+
+            if [ "${stat_old}" == "${stat_new}" ]; then
+                if [ $minutes_ago -ge $SPINDOWN_DELAY ]; then
+                    echo ${current} "- Drive /dev/${device} is awake and hasn't been used in ${minutes_ago} minutes; spinning down"
+                    hdparm -y /dev/${device} > /dev/null 2>&1
+                else
+                    echo ${current} "- Drive /dev/${device} was last used ${minutes_ago} minutes ago, less than spindown setting ($SPINDOWN_DELAY)"
+                fi
+            else
+                echo ${current} "- Drive /dev/${device} has been used..."
+                echo ${stat_new} > ${filename}
+            fi
+        fi
+    else
+        if [ "$DEBUG" = true ]; then
+            echo -e "${device} is asleep\n"
+        fi
+    fi
+
+}
+
+for device_id in ${drives[*]}
+do
+    do_device ${device_id}
+done
