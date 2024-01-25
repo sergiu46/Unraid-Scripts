@@ -77,5 +77,6 @@ do_device() {
 
 for device_id in ${drives[*]}
 do
+    echo -e " "
     do_device ${device_id}
 done
