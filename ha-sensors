@@ -1,57 +1,74 @@
 #!/bin/bash
 
-output_dir="/dev/shm/ha-sensors"
-mkdir -p "$output_dir"
 
-# List of devices by ID
-for dev in /dev/disk/by-id/*; do
-    if [ -b "$dev" ] && [[ ! "$dev" =~ -part[0-9]+ ]]; then
-        actual_dev=$(readlink -f "$dev")
+# Define your drives to be monitored
+drives=(
+  "THNSN5256GPUK_NVMe_TOSHIBA_256GB_37MB401OKSFU"
+  "ADATA_SU650_2M362L186QLD"
+  "HGST_HTS545050A7E680_RBA50K1L079XGC"
+  "WD_Elements_SE_2622_575845324136334C45384643"
+  "WD_Elements_SE_2623_575832324137333558314854"
+  "WD_My_Passport_25E1_575841314138374530545032"
 
-        if [[ "$dev" == *"ata-"* || "$dev" == *"usb-"* || "$dev" == *"nvme-"* ]]; then
-            if [[ "$dev" == *"nvme-"* ]]; then
-                status=""
-            else
-                status=$(hdparm -C "$actual_dev" 2>/dev/null | grep -i 'standby')
-            fi
+)
 
-            if [ -z "$status" ]; then
-                if [[ "$dev" == *"nvme-"* ]]; then
-                    temp=$(nvme smart-log "$actual_dev" 2>/dev/null | grep -i 'temperature' | awk 'NR==1 {print $3}')
-                else
-                    temp=$(smartctl -a "$actual_dev" 2>/dev/null | grep -i 'Temperature_Celsius' | awk '{print $10}')
-                fi
+# Set sensors files directory
+SENSORS_DIR="/dev/shm/ha-sensors"
+mkdir -p "${SENSORS_DIR}"
 
-                # If it's a USB device, remove "-0:0" from the device name
-                if [[ "$dev" == *"usb-"* ]]; then
-                    clean_dev_name=$(basename "$dev" | sed 's/-0:0$//')
-                else
-                    clean_dev_name=$(basename "$dev")
-                fi
 
-                # Remove unit and save the numeric temperature value to the file
-                if [[ "$temp" =~ ^[0-9]+$ ]]; then
-                    echo "$temp" > "$output_dir/${clean_dev_name}_temp"
-                fi
-            fi
+drive_temp_state() {
+    local device_id=$1
+    
+    device=$(ls -l /dev/disk/by-id/ | grep -E ${device_id} | awk '{print $NF}' | sed 's#.*/##' | head -1)
+
+    if [[ "$device" == *"nvme"* ]]; then
+        # Get NVME Temperature
+        nvme smart-log "/dev/$device" 2>/dev/null | grep -i '^temperature' | awk 'NR==1 {print $3}' > ${SENSORS_DIR}/${device_id}_temp
+    else
+
+        # Check if the drive is awake or asleep
+        is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
+    
+        if [ "${is_awake}" == "1" ]; then
+            # Save drive state
+            echo "on" > ${SENSORS_DIR}/${device_id}_status
+            # Get drive temperature
+            smartctl -a /dev/${device} 2>/dev/null | grep -i 'Temperature_Celsius' | awk '{print $10}' > ${SENSORS_DIR}/${device_id}_temp
+        else
+            # Save drive state
+            echo "off" > ${SENSORS_DIR}/${device_id}_status
+            # Save temperature as 0
+            echo "0" > ${SENSORS_DIR}/${device_id}_temp
         fi
+
     fi
+
+}
+
+
+# Process each drive
+for device_id in "${drives[@]}"
+do
+    drive_temp_state "${device_id}"
 done
 
-# Save /tmp and /dev/shm size to individual files
-du -s /tmp | awk '{printf "%.2f\n", $1/1024}' > "$output_dir/tmp_size"
-du -s /dev/shm | awk '{printf "%.2f\n", $1/1024}' > "$output_dir/dev_shm_size"
-
-# Cache fill
-zpool list cache -o cap | tr '\n' ' ' | awk '{print $2}' | sed 's/%//' > "$output_dir/mnt_cache_size"
 
 # CPU Temp
-sensors | awk '/CPU Temp/ {gsub(/[^0-9.]/, "", $3); print $3}' > "$output_dir/cpu_temp"
+sensors | awk '/CPU Temp/ {gsub(/[^0-9.]/, "", $3); print $3}' > "$SENSORS_DIR/cpu_temp"
 
 # Memory usage
-free | awk '/Mem:/ {printf "%.2f\n", $3/$2 * 100}' > "$output_dir/memory_usage"
+free | awk '/Mem:/ {printf "%.2f\n", $3/$2 * 100}' > "$SENSORS_DIR/memory_usage"
+
+# Cache utilization
+zpool list cache -o cap | tr '\n' ' ' | awk '{print $2}' | sed 's/%//' > "$SENSORS_DIR/cache_utilization"
 
 # Array utilization
-df -ht fuse.shfs | awk '$NF=="/mnt/user" {gsub("%","", $5); print $5}' > "$output_dir/array_utilization"
+df -ht fuse.shfs | awk '$NF=="/mnt/user" {gsub("%","", $5); print $5}' > "$SENSORS_DIR/array_utilization"
 
+# Save /tmp and /dev/shm size to individual files
+du -s /tmp | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/tmp_size"
+du -s /dev/shm | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/shm_size"
 
+# Extract fan speeds and save each one to a separate file
+sensors | awk '/Array Fan:/ {gsub(/[^0-9]/, "", $3); print $3 > "'"$SENSORS_DIR"'/Array_Fan_" NR}'
