@@ -20,26 +20,41 @@ mkdir -p "${SENSORS_DIR}"
 drive_temp_state() {
     local device_id=$1
     
-    device=$(ls -l /dev/disk/by-id/ | grep -E ${device_id} | awk '{print $NF}' | sed 's#.*/##' | head -1)
+    device=$(ls -l /dev/disk/by-id/ | grep -E "${device_id}" | awk '{print $NF}' | sed 's#.*/##' | head -1)
 
-    if [[ "$device" == *"nvme"* ]]; then
-        # Get NVME Temperature
-        nvme smart-log "/dev/$device" 2>/dev/null | grep -i '^temperature' | awk 'NR==1 {print $3}' > ${SENSORS_DIR}/${device_id}_temp
+    if [[ "$device" == "nvme"* ]]; then
+        nvme_temp=$(nvme smart-log "/dev/$device" 2>/dev/null | awk '/^temperature/ {print $3}')
+        echo "$nvme_temp" > "${SENSORS_DIR}/${device_id}_temp"
     else
 
-        # Check if the drive is awake or asleep
-        is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
-    
-        if [ "${is_awake}" == "1" ]; then
-            # Save drive state
-            echo "on" > ${SENSORS_DIR}/${device_id}_status
-            # Get drive temperature
-            smartctl -a /dev/${device} 2>/dev/null | grep -i 'Temperature_Celsius' | awk '{print $10}' > ${SENSORS_DIR}/${device_id}_temp
-        else
-            # Save drive state
-            echo "off" > ${SENSORS_DIR}/${device_id}_status
-            # Save temperature as 0
-            echo "0" > ${SENSORS_DIR}/${device_id}_temp
+        # Check drive state
+        state=$(hdparm -C "/dev/$device" 2>/dev/null | awk -F': ' '/drive state is:/ {print $2}' | xargs)
+        
+        # Debug
+        #echo "$device_id: $state"
+
+        if [[ "${state}" == "active/idle" ]]; then
+            echo "on" > "${SENSORS_DIR}/${device_id}_status"
+            drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius/ {print $10}')
+            echo "$drive_temp" > "${SENSORS_DIR}/${device_id}_temp"
+            
+        elif [[ "$state" == "standby" ]]; then
+            echo "off" > "${SENSORS_DIR}/${device_id}_status"
+            echo "0" > "${SENSORS_DIR}/${device_id}_temp"
+            
+        elif [[ "$state" == "unknown" ]]; then
+            drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius/ {print $10}')
+            echo "$drive_temp" > "${SENSORS_DIR}/${device_id}_temp"
+            
+            # Check if drive is awake with smartctl
+            is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
+            
+            if [ "${is_wake}" == 1 ]; then
+                echo "on" > ${SENSORS_DIR}/${device_id}_status
+            else 
+                echo "off" > ${SENSORS_DIR}/${device_id}_status
+                
+            fi
         fi
 
     fi
