@@ -1,7 +1,14 @@
 #!/bin/bash
+# This script create a file for each sensor that you want to monitor in Home Assistant
+
+# Uncomment to have debug information
+# DEBUG=true
+
+# Define sensors directory
+SENSORS_DIR="/dev/shm/ha-sensors"
 
 
-# Define your drives to be monitored
+# Define drives to be monitores
 drives=(
   "THNSN5256GPUK_NVMe_TOSHIBA_256GB_37MB401OKSFU"
   "ADATA_SU650_2M362L186QLD"
@@ -12,13 +19,32 @@ drives=(
 
 )
 
-# Set sensors files directory
-SENSORS_DIR="/dev/shm/ha-sensors"
+
+
+# Create sensors directory
 mkdir -p "${SENSORS_DIR}"
 
-DEBUG=true
+# CPU Temp
+sensors | awk '/CPU Temp/ {gsub(/[^0-9.]/, "", $3); print $3}' > "$SENSORS_DIR/cpu_temp"
+
+# Memory usage
+free | awk '/Mem:/ {printf "%.2f\n", $3/$2 * 100}' > "$SENSORS_DIR/memory_usage"
+
+# Cache utilization
+zpool list cache -o cap | tr '\n' ' ' | awk '{print $2}' | sed 's/%//' > "$SENSORS_DIR/cache_utilization"
+
+# Array utilization
+df -ht fuse.shfs | awk '$NF=="/mnt/user" {gsub("%","", $5); print $5}' > "$SENSORS_DIR/array_utilization"
+
+# Save /tmp and /dev/shm size to individual files
+du -s /tmp | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/tmp_size"
+du -s /dev/shm | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/shm_size"
+
+# Extract fan speeds and save each one to a separate file
+sensors | awk '/Array Fan:/ {gsub(/[^0-9]/, "", $3); print $3 > "'"$SENSORS_DIR"'/Array_Fan_" NR}'
 
 
+# Get drive temp and state
 drive_temp_state() {
     local device_id=$1
     
@@ -78,23 +104,3 @@ for device_id in "${drives[@]}"
 do
     drive_temp_state "${device_id}"
 done
-
-
-# CPU Temp
-sensors | awk '/CPU Temp/ {gsub(/[^0-9.]/, "", $3); print $3}' > "$SENSORS_DIR/cpu_temp"
-
-# Memory usage
-free | awk '/Mem:/ {printf "%.2f\n", $3/$2 * 100}' > "$SENSORS_DIR/memory_usage"
-
-# Cache utilization
-zpool list cache -o cap | tr '\n' ' ' | awk '{print $2}' | sed 's/%//' > "$SENSORS_DIR/cache_utilization"
-
-# Array utilization
-df -ht fuse.shfs | awk '$NF=="/mnt/user" {gsub("%","", $5); print $5}' > "$SENSORS_DIR/array_utilization"
-
-# Save /tmp and /dev/shm size to individual files
-du -s /tmp | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/tmp_size"
-du -s /dev/shm | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/shm_size"
-
-# Extract fan speeds and save each one to a separate file
-sensors | awk '/Array Fan:/ {gsub(/[^0-9]/, "", $3); print $3 > "'"$SENSORS_DIR"'/Array_Fan_" NR}'
