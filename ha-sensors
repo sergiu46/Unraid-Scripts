@@ -16,6 +16,8 @@ drives=(
 SENSORS_DIR="/dev/shm/ha-sensors"
 mkdir -p "${SENSORS_DIR}"
 
+DEBUG=true
+
 
 drive_temp_state() {
     local device_id=$1
@@ -25,35 +27,44 @@ drive_temp_state() {
     if [[ "$device" == "nvme"* ]]; then
         nvme_temp=$(nvme smart-log "/dev/$device" 2>/dev/null | awk '/^temperature/ {print $3}')
         echo "$nvme_temp" > "${SENSORS_DIR}/${device_id}_temp"
+        
+        [ "$DEBUG" = "true" ] && echo "$device | $device_id"
+        [ "$DEBUG" = "true" ] && echo "$nvme_temp"
     else
 
         # Check drive state
-        state=$(hdparm -C "/dev/$device" 2>/dev/null | awk -F': ' '/drive state is:/ {print $2}' | xargs)
+        state=$(hdparm -C "/dev/${device}" 2>/dev/null | awk -F': ' '/drive state is:/ {print $2}' | xargs )
         
         # Debug
-        #echo "$device_id: $state"
+        [ "$DEBUG" = "true" ] && echo "$device | $state | $device_id"
 
         if [[ "${state}" == "active/idle" ]]; then
             echo "on" > "${SENSORS_DIR}/${device_id}_status"
+        
             drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius/ {print $10}')
             echo "$drive_temp" > "${SENSORS_DIR}/${device_id}_temp"
             
+            [ "$DEBUG" = "true" ] && echo "on | $drive_temp"
         elif [[ "$state" == "standby" ]]; then
             echo "off" > "${SENSORS_DIR}/${device_id}_status"
             echo "0" > "${SENSORS_DIR}/${device_id}_temp"
             
+            [ "$DEBUG" = "true" ] && echo "off | 0"
+            
         elif [[ "$state" == "unknown" ]]; then
+        
             drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius/ {print $10}')
             echo "$drive_temp" > "${SENSORS_DIR}/${device_id}_temp"
             
             # Check if drive is awake with smartctl
             is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
             
-            if [ "${is_wake}" == 1 ]; then
+            if [[ "${is_awake}" == "1" ]]; then
                 echo "on" > ${SENSORS_DIR}/${device_id}_status
+                [ "$DEBUG" = "true" ] && echo "on | $drive_temp"
             else 
                 echo "off" > ${SENSORS_DIR}/${device_id}_status
-                
+                [ "$DEBUG" = "true" ] && echo "off | $drive_temp"
             fi
         fi
 
