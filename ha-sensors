@@ -53,7 +53,7 @@ drive_temp_state() {
     status="n/a"
     
     if [[ "$device" == "nvme"* ]]; then
-        drive_temp=$(nvme smart-log /dev/nvme0n1 2>/dev/null | awk '/^temperature/ { t=$3; u=$4; if(u ~ /°F/) { printf "%.0f\n", (t-32)*5/9 } else { printf "%.0f\n", t } }' )
+        drive_temp=$(nvme smart-log "/dev/${device%n*}" 2>/dev/null | awk '/^temperature/ { t=$3; u=$4; if(u ~ /°F/) { printf "%.0f\n", (t-32)*5/9 } else { printf "%.0f\n", t } }' )
         
     else
         # Check drive state
