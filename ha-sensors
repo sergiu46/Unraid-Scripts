@@ -2,7 +2,7 @@
 # This script create a file for each sensor that you want to monitor in Home Assistant
 
 # Uncomment to have debug information
-# DEBUG=true
+DEBUG=true
 
 # Define sensors directory
 SENSORS_DIR="/dev/shm/ha-sensors"
@@ -10,12 +10,12 @@ SENSORS_DIR="/dev/shm/ha-sensors"
 
 # Define drives to be monitores
 drives=(
-    "WD_My_Passport_25E1_575841314138374530545032"
-    "WD_Elements_SE_2623_575832324137333558314854"
-    "WD_Elements_SE_2622_575845324136334C45384643"
-    "HGST_HTS545050A7E680_RBA50K1L079XGC"
-    "ADATA_SU650_2M362L186QLD"
-    "THNSN5256GPUK_NVMe_TOSHIBA_256GB_37MB401OKSFU"
+    "THNSN5256GPUK_NVMe_TOSHIBA_256GB_XXXXXXXXXXXXX"
+    "Samsung_SSD_850_EVO_250GB_XXXXXXXXXXXXXXXXXXXX"
+    "HGST_HTS545050A7E680_XXXXXXXXXXXXXXXXXXXXXXXXX"
+    "WD_My_Passport_25E1_XXXXXXXXXXXXXXXXXXXXXXXXXX"
+    "WD_Elements_SE_2623_XXXXXXXXXXXXXXXXXXXXXXXXXX"
+    "WD_Elements_SE_2622_XXXXXXXXXXXXXXXXXXXXXXXXXX"
 )
 
 
@@ -60,7 +60,7 @@ drive_temp_state() {
         state=$(hdparm -C "/dev/${device}" 2>/dev/null | awk -F': ' '/drive state is:/ {print $2}' | xargs )
         
         if [[ "${state}" == "active/idle" ]]; then
-            drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius/ {print $10}')
+            drive_temp=$(smartctl -A "/dev/$device" 2>/dev/null | awk '/Temperature_Celsius|Airflow_Temperature_C/ {print $10}')
             status="on"
             
         elif [[ "$state" == "standby" ]]; then
