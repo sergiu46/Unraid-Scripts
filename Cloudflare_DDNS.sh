@@ -61,7 +61,7 @@ if [ "$IP" != "$CURRENT_IP" ]; then
     -H "Authorization: Bearer $CF_API_TOKEN" \
     -H "Content-Type: application/json" \
     --data '{"type":"A","name":"'"$DOMAIN"'","content":"'"$IP"'","ttl":1,"proxied":false}' > /dev/null 2>&1
-  echo "✅ Success: IP updated."
+  echo "✅ Success: IP updated: $IP"
 else
   echo "✅ IP is up to date: $IP"
 fi
