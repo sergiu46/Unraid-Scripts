@@ -1,13 +1,5 @@
 #!/bin/bash
 
-# Configuration
-CF_API_TOKEN="TOKEN"
-ZONE_ID="ZONE_ID"
-DOMAIN="DOMAIN or SUBDOMAIN"
-
-
-###################################################################################################
-
 # Cache settings in RAM
 CACHE_DIR="/dev/shm/Cloudflare"
 mkdir -p "$CACHE_DIR"
