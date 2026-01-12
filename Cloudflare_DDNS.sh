@@ -8,18 +8,24 @@
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
+#
 # CF_API_TOKEN="YOUR_TOKEN"
 # ZONE_ID="YOUR_ZONE_ID"
 # DOMAIN="example.com" or "*.example.com"
 #
-# GITHUB_URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
-# TEMP_SCRIPT="/dev/shm/scripts/Cloudflare_DDNS.sh"
-# mkdir -p "/dev/shm/scripts"
-# [[ -f "$TEMP_SCRIPT" ]] || \
-#   curl -s -fL "$GITHUB_URL" -o "$TEMP_SCRIPT" || \
-#   { echo "❌ Failed"; exit 1; }
-# source "$TEMP_SCRIPT"
+# DIR="/dev/shm/scripts"
+# SCRIPT="$DIR/Cloudflare_DDNS.sh"
+# URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
+#
+# mkdir -p "$DIR"
+# [[ -f "$SCRIPT" ]] || \
+#   curl -s -fL "$URL" -o "$SCRIPT" || \
+#   { echo "❌ Download Failed"; exit 1; }
+# source "$SCRIPT"
+#
 #########################################################################
+
+
 #!/bin/bash
 # Cache settings in RAM
 CACHE_DIR="/dev/shm/Cloudflare"
