@@ -6,6 +6,31 @@ ZONE_ID=""
 RECORD_ID=""
 DOMAIN="*.domain.com"
 
+GET_RECORD_ID=true
+
+# Get RECORD_ID
+if [ "$GET_RECORD_ID" = true ]; then
+    echo "Searching for Record ID for: $DOMAIN..."
+    
+    # Fetch records and use jq to filter for the specific domain name
+    RESULT=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records" \
+         -H "Authorization: Bearer $CF_API_TOKEN" \
+         -H "Content-Type: application/json")
+    
+    # This filters the JSON to show only the ID for your specific domain
+    RECORD_ID=$(echo "$RESULT" | jq -r ".result[] | select(.name==\"$DOMAIN\") | .id")
+
+    if [ ! -z "$RECORD_ID" ]; then
+        echo "--------------------------------------------"
+        echo "FOUND RECORD ID: $RECORD_ID"
+        echo "--------------------------------------------"
+        echo "Copy this ID to your RECORD_ID variable and set GET_RECORD_ID=false"
+    else
+        echo "Record not found. Here is the full list of records in this zone:"
+        echo "$RESULT" | jq -r '.result[] | "\(.id) \t \(.type) \t \(.name)"'
+    fi
+    exit 0
+fi
 
 # 1. Get Public IP via Cloudflare Trace
 # We use grep to extract just the IP address from the trace output
