@@ -1,5 +1,26 @@
+#########################################################################
+# CLOUDFLARE DDNS
+# 
+# HOW TO USE:
+# Do not run this script directly. Instead, create a new "User Script" 
+# in Unraid and paste the "Loader" code below. This keeps your 
+# API tokens safe and local to your machine.
+#
+# --- COPY THIS TO UNRAID USER SCRIPTS ---
+# #!/bin/bash
+# CF_API_TOKEN="YOUR_TOKEN"
+# ZONE_ID="YOUR_ZONE_ID"
+# DOMAIN="example.com" or "*.example.com"
+#
+# GITHUB_URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
+# TEMP_SCRIPT="/dev/shm/scripts/Cloudflare_DDNS.sh"
+# mkdir -p "/dev/shm/scripts"
+# [[ -f "$TEMP_SCRIPT" ]] || \
+#   curl -s -fL "$GITHUB_URL" -o "$TEMP_SCRIPT" || \
+#   { echo "❌ Failed"; exit 1; }
+# source "$TEMP_SCRIPT"
+#########################################################################
 #!/bin/bash
-
 # Cache settings in RAM
 CACHE_DIR="/dev/shm/Cloudflare"
 mkdir -p "$CACHE_DIR"
@@ -53,7 +74,7 @@ if [ "$IP" != "$CURRENT_IP" ]; then
     -H "Authorization: Bearer $CF_API_TOKEN" \
     -H "Content-Type: application/json" \
     --data '{"type":"A","name":"'"$DOMAIN"'","content":"'"$IP"'","ttl":1,"proxied":false}' > /dev/null 2>&1
-  echo "✅ Success: IP updated: $IP"
+  echo "✅ Success: IP updated!"
 else
   echo "✅ IP is up to date: $IP"
 fi
