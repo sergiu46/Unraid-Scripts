@@ -32,7 +32,7 @@
 #
 # # Download and execute script
 # mkdir -p "$DIR"
-# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT"
+# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT" && rm -rf "$STATUS_DIR"
 # [[ -f "$SCRIPT" ]] || \
 #     curl -s -fL "$URL" -o "$SCRIPT" || \
 #     { echo "❌ Download Failed"; exit 1; }
@@ -53,7 +53,7 @@ else
     MODE="NIGHT"
 fi
 
-# Set directories for status and sensor files
+# Set directory for status
 mkdir -p "${STATUS_DIR}" 
 
 current=`date`
@@ -62,7 +62,6 @@ do_device() {
     local device_id=$1
     device=`ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4`
     filename="${STATUS_DIR}/diskaccess-${device_id}.status"
-    sensor_file="${SENSORS_DIR}/${device_id}_status"
 
     # Check if the drive is awake or asleep
     is_awake=`smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'`
