@@ -1,5 +1,6 @@
 #!/bin/bash
 
+echo
 # Determine Spindown Delay based on Time of Day
 current_time="$(date +'%k%M')"
 if [ "${current_time}" -ge "${DAY_HOUR}" ] && [ "${current_time}" -lt "${NIGHT_HOUR}" ]; then 
