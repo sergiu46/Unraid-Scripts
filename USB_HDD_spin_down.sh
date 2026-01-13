@@ -1,29 +1,16 @@
 #!/bin/bash
-# This script checks HDD activity spin down unused drives
 
-# Define your drives
-drives=(
-  "usb-WD_Elements_SE_2622_575845324136334C45384643"
-  "usb-WD_Elements_SE_2623_575832324137333558314854"
-  "usb-WD_My_Passport_25E1_575841314138374530545032"
-)
-
-# Set spindown delay based on time of day
+# Determine Spindown Delay based on Time of Day
 current_time="$(date +'%k%M')"
-lower_bound='0900'
-upper_bound='2200'
-
-if [ "${current_time}" -ge "${lower_bound}" -a "${current_time}" -lt "${upper_bound}" ]; then 
-    SPINDOWN_DELAY=60
+if [ "${current_time}" -ge "${DAY_HOUR}" ] && [ "${current_time}" -lt "${NIGHT_HOUR}" ]; then 
+    SPINDOWN_DELAY=$DAY_DELAY
+    MODE="DAY"
 else
-    SPINDOWN_DELAY=15
+    SPINDOWN_DELAY=$NIGHT_DELAY
+    MODE="NIGHT"
 fi
 
-# Uncomment to enable debug mode
-# DEBUG=true
-
 # Set directories for status and sensor files
-STATUS_DIR="/dev/shm/hdd"
 mkdir -p "${STATUS_DIR}" 
 
 current=`date`
@@ -87,4 +74,5 @@ do
     do_device ${device_id}
 done
 
+echo
 
