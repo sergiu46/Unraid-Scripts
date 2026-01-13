@@ -27,6 +27,10 @@
 
 
 #!/bin/bash
+
+echo
+echo Domain: ${DOMAIN}
+
 # Cache settings in RAM
 CACHE_DIR="/dev/shm/Cloudflare"
 mkdir -p "$CACHE_DIR"
@@ -84,3 +88,4 @@ if [ "$IP" != "$CURRENT_IP" ]; then
 else
   echo "✅ IP is up to date: $IP"
 fi
+echo
