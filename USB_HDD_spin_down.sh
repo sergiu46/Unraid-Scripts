@@ -32,7 +32,7 @@
 #
 # # Download and execute script
 # mkdir -p "$DIR"
-# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT" && rm -rf "$STATUS_DIR"
+# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT"
 # [[ -f "$SCRIPT" ]] || \
 #     curl -s -fL "$URL" -o "$SCRIPT" || \
 #     { echo "❌ Download Failed"; exit 1; }
