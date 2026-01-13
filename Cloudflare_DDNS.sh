@@ -13,11 +13,15 @@
 # ZONE_ID="YOUR_ZONE_ID"
 # DOMAIN="example.com" or "*.example.com"
 #
+# # Uncomment to enable debug mode
+# # DEBUG=true
+#
 # DIR="/dev/shm/scripts"
 # SCRIPT="$DIR/Cloudflare_DDNS.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
 #
 # mkdir -p "$DIR"
+# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT"
 # [[ -f "$SCRIPT" ]] || \
 #   curl -s -fL "$URL" -o "$SCRIPT" || \
 #   { echo "❌ Download Failed"; exit 1; }
@@ -38,6 +42,7 @@ SAFE_NAME=$(echo "$DOMAIN" | sed 's/\*/wildcard/g; s/\./_/g')
 CACHE_FILE="$CACHE_DIR/${SAFE_NAME}.id"
 
 # Get Record ID from cache or Cloudflare API
+[[ "$DEBUG" == "true" ]] && rm -f "$CACHE_FILE"
 if [ -f "$CACHE_FILE" ]; then
     RECORD_ID=$(cat "$CACHE_FILE")
 else
