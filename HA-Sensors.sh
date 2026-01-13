@@ -1,25 +1,7 @@
 #!/bin/bash
 # This script create a file for each sensor that you want to monitor in Home Assistant
 
-# Uncomment to have debug information
-DEBUG=true
-
-# Define sensors directory
-SENSORS_DIR="/dev/shm/ha-sensors"
-
-
-# Define drives to be monitores
-drives=(
-    "THNSN5256GPUK_NVMe_TOSHIBA_256GB_XXXXXXXXXXXXX"
-    "Samsung_SSD_850_EVO_250GB_XXXXXXXXXXXXXXXXXXXX"
-    "HGST_HTS545050A7E680_XXXXXXXXXXXXXXXXXXXXXXXXX"
-    "WD_My_Passport_25E1_XXXXXXXXXXXXXXXXXXXXXXXXXX"
-    "WD_Elements_SE_2623_XXXXXXXXXXXXXXXXXXXXXXXXXX"
-    "WD_Elements_SE_2622_XXXXXXXXXXXXXXXXXXXXXXXXXX"
-)
-
-
-
+echo
 # Create sensors directory
 mkdir -p "${SENSORS_DIR}"
 
@@ -92,3 +74,5 @@ for device_id in "${drives[@]}"
 do
     drive_temp_state "${device_id}"
 done
+
+echo
