@@ -1,3 +1,44 @@
+#########################################################################
+# USB HDD spin down script.
+# 
+# HOW TO USE:
+# Do not run this script directly. Instead, create a new "User Script" 
+# in Unraid and paste the code below.
+#
+# --- COPY THIS TO UNRAID USER SCRIPTS ---
+# #!/bin/bash
+#
+# # ID of the drives to be processed by script
+# drives=(
+#   "usb-WD_Elements_SE_0000_XXXXXXXXXXXXXXXXXXXXXXXX"
+#   "usb-WD_Elements_SE_0000_XXXXXXXXXXXXXXXXXXXXXXXX"
+#   "usb-WD_My_Passport_0000_XXXXXXXXXXXXXXXXXXXXXXXX"
+# )
+#
+# # Uncomment to enable debug mode
+# # DEBUG=true
+#
+# # Delay, hours and status dir
+# DAY_DELAY=60
+# NIGHT_DELAY=30
+# DAY_HOUR='0900'
+# NIGHT_HOUR='2200'
+# STATUS_DIR="/dev/shm/hdd"
+#
+# # GitHub script
+# DIR="/dev/shm/scripts"
+# SCRIPT="$TEMP_DIR/HDD_Spindown_Logic.sh"
+# URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/USB_HDD_spin_down.sh"
+#
+# # Download and execute script
+# mkdir -p "$DIR"
+# [[ -f "$SCRIPT" ]] || \
+#     curl -s -fL "$URL" -o "$SCRIPT" || \
+#     { echo "❌ Download Failed"; exit 1; }
+# source "$SCRIPT"
+#
+#########################################################################
+
 #!/bin/bash
 
 echo
