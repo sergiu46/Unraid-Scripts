@@ -1,22 +1,22 @@
 #########################################################################
 # Unraid sensors in Home Assistant
+# This script create a file for each sensor that you want to monitor in Home Assistant.
 # 
 # HOW TO USE:
 # Do not run this script directly. Instead, create a new "User Script" 
-# in Unraid and paste the "Loader" code below. This keeps your 
-# API tokens safe and local to your machine.
+# in Unraid and paste the code below.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
+#
+# # Uncomment to enable debug mode
+# # DEBUG=true
 #
 # # ID of the drives to be monitores
 # drives=(
 #     "THNSN5256GPUK_NVMe_TOSHIBA_256GB_XXXXXXXXXXX"
 #     "WD_Elements_SE_2622_XXXXXXXXXXXXXXXXXXXXXXXX"
 # )
-#
-# # Uncomment to enable debug mode
-# #DEBUG=true
 #
 # # Define sensors directory
 # SENSORS_DIR="/dev/shm/ha-sensors"
@@ -37,7 +37,6 @@
 #########################################################################
 
 #!/bin/bash
-# This script create a file for each sensor that you want to monitor in Home Assistant
 
 echo
 # Create sensors directory
