@@ -3,8 +3,7 @@
 # 
 # HOW TO USE:
 # Do not run this script directly. Instead, create a new "User Script" 
-# in Unraid and paste the "Loader" code below. This keeps your 
-# API tokens safe and local to your machine.
+# in Unraid and paste the code below.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
