@@ -72,12 +72,20 @@ RESPONSE=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/d
   -H "Authorization: Bearer $CF_API_TOKEN" \
   -H "Content-Type: application/json")
 
+SUCCESS=$(echo "$RESPONSE" | jq -r '.success')
 CURRENT_TYPE=$(echo "$RESPONSE" | jq -r '.result.type')
 CURRENT_IP=$(echo "$RESPONSE" | jq -r '.result.content')
 
-#  If record is not 'A' (Tunnel mode), stop
+# If the API call failed or record is null, the cache is likely invalid
+if [ "$SUCCESS" != "true" ] || [ "$CURRENT_TYPE" == "null" ]; then
+  echo "⚠️ Record ID is invalid or deleted. Clearing cache and retrying..."
+  rm -f "$CACHE_FILE"
+  exit 1 # Exit so the next cron run starts fresh, or wrap in a loop
+fi
+
+# If record is not 'A' (e.g., CNAME or Tunnel), stop
 if [ "$CURRENT_TYPE" != "A" ]; then
-  echo "🛡️ Tunnel Mode active (Type: $CURRENT_TYPE). Skipping update."
+  echo "🛡️ Non-A Record active (Type: $CURRENT_TYPE). Skipping update."
   exit 0
 fi
 
