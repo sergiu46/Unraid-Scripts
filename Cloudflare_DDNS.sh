@@ -106,19 +106,21 @@ upsert_record() {
         --data "{\"type\":\"$type\",\"name\":\"$DOMAIN\",\"content\":\"$content\",\"ttl\":1,\"proxied\":$proxy}"
 }
 
+#!/usr/bin/env bash
+
+# ==========================================
+# UNRAID NOTIFICATION FUNCTION
+# ==========================================
 unraid_notify() {
     local message="$1"
     local flag="$2" # "success" or "warning"
 
-    # 1. Respect notification settings
     [[ "$notification_type" == "none" ]] && return 0
     [[ "$notification_type" == "error" && "$flag" == "success" ]] && return 0
 
-    # 2. Map flag to Unraid severity
     local severity="normal"
     [[ "$flag" == "warning" ]] && severity="warning"
 
-    # 3. Call the Unraid notification script
     if [ -f "/usr/local/emhttp/webGui/scripts/notify" ]; then
         /usr/local/emhttp/webGui/scripts/notify \
             -s "Cloudflare DDNS Update" \
@@ -128,28 +130,22 @@ unraid_notify() {
 }
 
 # ==========================================
-# MAIN
+# MAIN EXECUTION
 # ==========================================
 main() {
     echo "🔍 DDNS Check: $DOMAIN"
-    
-    # 1. Debug: Force cache clear
     [ "$DEBUG" = "true" ] && rm -f "$IP_CACHE"
 
-    # 2. Get Public IP
     CURRENT_IP=$(get_public_ip)
     [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
 
-    # 3. Get Cloudflare State
     IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
 
-    # 4. Cache Check (Skip in Debug)
     if [ "$DEBUG" != "true" ] && [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
         echo "✅ IP unchanged: $CURRENT_IP"
         return 0
     fi
 
-    # 5. Determine required Mode (Public vs CGNAT)
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
         echo "🔒 Mode: CGNAT. IP: $CURRENT_IP"
@@ -159,42 +155,46 @@ main() {
         echo "🌐 Mode: Public. IP: $CURRENT_IP"
     fi
 
-    # 6. Update Logic
+    # API Sync Logic
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
-        # Don't update if disabled, unless it's a brand new record
         [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ] && return 0
+
+        local SHOULD_NOTIFY=false
+        local MSG=""
 
         if [ "$CF_ID" == "null" ]; then
             echo "🆕 Creating new record..."
-            METHOD="POST"; TARGET_ID=""; MSG="Created new $REQ_TYPE record for $DOMAIN."
+            METHOD="POST"; TARGET_ID=""; SHOULD_NOTIFY=true
+            MSG="Created new $REQ_TYPE record for $DOMAIN (IP: $CURRENT_IP)."
         elif [ "$CF_TYPE" != "$REQ_TYPE" ]; then
             echo "🔄 Type change detected. Recreating..."
             curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$CF_ID" \
                  -H "Authorization: Bearer $CF_API_TOKEN" > /dev/null
-            METHOD="POST"; TARGET_ID=""; MSG="Switched $DOMAIN to $REQ_TYPE mode (IP: $CURRENT_IP)."
+            METHOD="POST"; TARGET_ID=""; SHOULD_NOTIFY=true
+            MSG="Switched $DOMAIN to $REQ_TYPE mode (IP: $CURRENT_IP)."
         else
             echo "🆙 Updating existing record..."
-            METHOD="PUT"; TARGET_ID="$CF_ID"; MSG="Updated IP for $DOMAIN to $CURRENT_IP."
+            METHOD="PUT"; TARGET_ID="$CF_ID"
+            # SHOULD_NOTIFY stays false for standard IP updates
         fi
         
         RES=$(upsert_record "$METHOD" "$TARGET_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
         
         if [[ "$RES" == *"\"success\":true"* ]]; then
             echo "$CURRENT_IP" > "$IP_CACHE"
-            unraid_notify "$MSG" "success"
+            # ONLY notify if it was a NEW record or a TYPE switch
+            if [ "$SHOULD_NOTIFY" = true ]; then
+                unraid_notify "$MSG" "success"
+            fi
         else
             ERR=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
             echo "❌ Update Failed: $ERR"
             unraid_notify "Cloudflare Update Failed for $DOMAIN: $ERR" "warning"
         fi
     else
-        # If we are here, everything matches perfectly.
         echo "$CURRENT_IP" > "$IP_CACHE"
-        if [ "$DEBUG" = "true" ]; then
-            echo "✅ DNS is already correct."
-            unraid_notify "Debug: $DOMAIN is currently correct." "success"
-        fi
+        [ "$DEBUG" = "true" ] && echo "✅ DNS is already correct."
     fi
 }
 
