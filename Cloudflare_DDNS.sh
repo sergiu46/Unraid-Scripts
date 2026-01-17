@@ -119,7 +119,7 @@ unraid_notify() {
 
     if [ -f "/usr/local/emhttp/webGui/scripts/notify" ]; then
         /usr/local/emhttp/webGui/scripts/notify \
-            -s "Cloudflare DDNS Update" \
+            -s "Cloudflare DDNS" \
             -d "$message" \
             -i "$severity"
     fi
