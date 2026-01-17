@@ -120,13 +120,13 @@ main() {
     fi
 
     CURRENT_IP=$(get_public_ip)
-    [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; exit 1; }
+    [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
 
     # 2. ALWAYS show if the cache matches (Production Mode)
     if [ "$DEBUG" != "true" ]; then
         if [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
             echo "✅ IP unchanged: $CURRENT_IP"
-            exit 0
+            return 0
         fi
     fi
 
@@ -150,7 +150,7 @@ main() {
             echo "⚠️ Mismatch detected, but CHANGE_DNS_RECORDS is not 'true'."
             echo "ℹ️  Cloudflare remains: $CF_TYPE -> $CF_CONTENT"
             echo "ℹ️  Detection found: $REQ_TYPE -> $REQ_CONTENT"
-            exit 0
+            return 0
         fi
 
         echo "🆙 Updating Cloudflare..."
