@@ -48,7 +48,7 @@ mkdir -p "$CACHE_DIR"
 # ==========================================
 if ! command -v jq &> /dev/null || ! command -v traceroute &> /dev/null; then
     echo "❌ Error: 'jq' or 'traceroute' is not installed."
-    return 1 2>/dev/null || exit 1
+    exit 1
 fi
 
 # ==========================================
@@ -98,67 +98,71 @@ upsert_record() {
 # MAIN
 # ==========================================
 
-# 1. ALWAYS show the start of the check
-echo "🔍 DDNS Check: $DOMAIN"
-
-if [ "$DEBUG" = "true" ]; then
-    echo "🧹 Debug Mode Active: Clearing cache..."
-    rm -f "$IP_CACHE"
-fi
-
-CURRENT_IP=$(get_public_ip)
-[ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1 2>/dev/null || exit 1; }
-
-# 2. ALWAYS show if the cache matches (Production Mode)
-if [ "$DEBUG" != "true" ]; then
-    if [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
-        echo "✅ IP unchanged: $CURRENT_IP."
-        return 0 2>/dev/null || exit 0
-    fi
-fi
-
-# Determine required state
-if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
-    echo "🔒 Mode: CGNAT. IP: $CURRENT_IP."
-    REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL_TARGET"; REQ_PROXY="true"
-else
-    echo "🌐 Mode: Public. IP: $CURRENT_IP."
-    REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
-    [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
-fi
-
-# API Sync
-IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
-
-SUCCESS=false
-if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
+main() {
+    # 1. ALWAYS show the start of the check
+    echo "🔍 DDNS Check: $DOMAIN"
     
-    if [ "$CHANGE_DNS_RECORDS" != "true" ]; then
-        echo "⚠️ Mismatch detected, but CHANGE_DNS_RECORDS is not 'true'."
-        echo "ℹ️  Cloudflare remains: $CF_TYPE -> $CF_CONTENT"
-        echo "ℹ️  Detection found: $REQ_TYPE -> $REQ_CONTENT"
-        return 0 2>/dev/null || exit 0
+    if [ "$DEBUG" = "true" ]; then
+        echo "🧹 Debug Mode Active: Clearing cache..."
+        rm -f "$IP_CACHE"
     fi
 
-    echo "🆙 Updating Cloudflare..."
-    if [ "$CF_TYPE" != "$REQ_TYPE" ] && [ "$CF_ID" != "null" ]; then
-        curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$CF_ID" \
-             -H "Authorization: Bearer $CF_API_TOKEN" > /dev/null
-        CF_ID=""; METHOD="POST"
+    CURRENT_IP=$(get_public_ip)
+    [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; exit 1; }
+
+    # 2. ALWAYS show if the cache matches (Production Mode)
+    if [ "$DEBUG" != "true" ]; then
+        if [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
+            echo "✅ IP unchanged: $CURRENT_IP."
+            exit 0
+        fi
+    fi
+
+    # Determine required state
+    if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
+        echo "🔒 Mode: CGNAT. IP: $CURRENT_IP."
+        REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL_TARGET"; REQ_PROXY="true"
     else
-        METHOD="PUT"
+        echo "🌐 Mode: Public. IP: $CURRENT_IP."
+        REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
+        [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
     fi
-    
-    RES=$(upsert_record "$METHOD" "$CF_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
-    [[ "$RES" == *"\"success\":true"* ]] && SUCCESS=true
-else
-    [ "$DEBUG" = "true" ] && echo "✅ DNS is already correct."
-    SUCCESS=true
-fi
 
-if [ "$SUCCESS" = true ]; then
-    echo "$CURRENT_IP" > "$IP_CACHE"
-    [ "$DEBUG" = "true" ] && echo "✅ Operation successful: $CURRENT_IP synced."
-else
-    echo "❌ Update Failed: $RES"
-fi
+    # API Sync
+    IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
+    
+    SUCCESS=false
+    if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
+        
+        if [ "$CHANGE_DNS_RECORDS" != "true" ]; then
+            echo "⚠️ Mismatch detected, but CHANGE_DNS_RECORDS is not 'true'."
+            echo "ℹ️  Cloudflare remains: $CF_TYPE -> $CF_CONTENT"
+            echo "ℹ️  Detection found: $REQ_TYPE -> $REQ_CONTENT"
+            exit 0
+        fi
+
+        echo "🆙 Updating Cloudflare..."
+        if [ "$CF_TYPE" != "$REQ_TYPE" ] && [ "$CF_ID" != "null" ]; then
+            curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$CF_ID" \
+                 -H "Authorization: Bearer $CF_API_TOKEN" > /dev/null
+            CF_ID=""; METHOD="POST"
+        else
+            METHOD="PUT"
+        fi
+        
+        RES=$(upsert_record "$METHOD" "$CF_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
+        [[ "$RES" == *"\"success\":true"* ]] && SUCCESS=true
+    else
+        # Only show this if we are specifically troubleshooting
+        [ "$DEBUG" = "true" ] && echo "✅ DNS is already correct."
+        SUCCESS=true
+    fi
+
+    if [ "$SUCCESS" = true ]; then
+        echo "$CURRENT_IP" > "$IP_CACHE"
+    else
+        echo "❌ Update Failed: $RES"
+    fi
+}
+
+main
