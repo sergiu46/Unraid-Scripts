@@ -26,8 +26,8 @@
 # SCRIPT="$DIR/Cloudflare_DDNS.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
 #
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
 # mkdir -p "$DIR"
-# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT"
 # [[ -f "$SCRIPT" ]] || \
 #   curl -s -fL "$URL" -o "$SCRIPT" || \
 #   { echo "❌ Download Failed"; exit 1; }
