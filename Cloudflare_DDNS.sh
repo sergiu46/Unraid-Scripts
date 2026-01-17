@@ -19,9 +19,9 @@
 # PROXIED="false"
 #
 # # --- BEHAVIOR ---
-# CHANGE_DNS_RECORDS="true"  # "true" = Full Auto. "false" = Update IP only, BLOCK Mode Switches (A <-> CNAME).
+# CHANGE_DNS_RECORDS="true"  # "true" = Full Auto. "false" = Update IP only, BLOCK Mode Switches.
 # NOTIFICATION_TYPE="all"    # Options: "all", "error", "none"
-# DEBUG="true"               # Set to "false" for daily use
+# DEBUG="false"              # Set to "true" to force update and clear cache
 #
 # # --- SYSTEM ---
 # CACHE_DIR="/dev/shm/Cloudflare"
@@ -37,7 +37,6 @@
 # source "$SCRIPT"
 #
 #########################################################################
-
 
 #!/bin/bash
 
@@ -71,14 +70,12 @@ is_cgnat() {
     local trace=$(traceroute -n -m 2 -q 1 "$ip" 2>/dev/null)
     debug_log "Traceroute result:\n$trace"
     
-    # Get the IP from the first hop line
     local first_hop=$(echo "$trace" | awk 'NR==2 {print $2}')
     debug_log "First hop detected: $first_hop"
 
-    # If the first hop IS our public IP, it's definitely Public.
     if [[ "$first_hop" == "$ip" ]]; then
         debug_log "Direct public hop detected. Skipping CGNAT checks."
-        return 1 # False (Is not CGNAT)
+        return 1 
     fi
 
     local found_ips=$(echo "$trace" | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")
@@ -88,10 +85,10 @@ is_cgnat() {
            [[ $found =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
            [[ $found =~ ^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\. ]]; then
             debug_log "Private signature found: $found"
-            return 0 # True (Is CGNAT)
+            return 0 
         fi
     done
-    return 1 # False
+    return 1 
 }
 
 get_cloudflare_state() {
@@ -111,11 +108,9 @@ upsert_record() {
 
 unraid_notify() {
     local message="$1"
-    local flag="$2" # "success" or "warning"
+    local flag="$2" 
 
-    # Default to "all" if variable is missing
     local mode="${NOTIFICATION_TYPE:-all}"
-
     [[ "$mode" == "none" ]] && return 0
     [[ "$mode" == "error" && "$flag" == "success" ]] && return 0
 
@@ -140,35 +135,38 @@ main() {
     CURRENT_IP=$(get_public_ip)
     [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
 
-    IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
-
+    # FAST CACHE CHECK: Skip API if IP hasn't changed
     if [ "$DEBUG" != "true" ] && [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
-        echo "✅ IP unchanged: $CURRENT_IP"
+        echo "✅ IP unchanged ($CURRENT_IP). Skipping API check."
         return 0
     fi
 
+    echo "🌐 IP Change/First Run detected ($CURRENT_IP). Syncing with Cloudflare..."
+    IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
+
+    # Determine required state
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
-        echo "🔒 Mode: CGNAT. IP: $CURRENT_IP"
+        echo "🔒 Mode: CGNAT"
     else
         REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
         [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
-        echo "🌐 Mode: Public. IP: $CURRENT_IP"
+        echo "🌐 Mode: Public"
     fi
 
     # API Sync Logic
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
         # --- SAFE MODE LOGIC ---
-        # If CHANGE_DNS_RECORDS is false, we only allow updates if the TYPE matches.
         if [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ]; then
             if [ "$CF_TYPE" != "$REQ_TYPE" ]; then
-                echo "⚠️ Update Blocked: Mode Switch ($CF_TYPE -> $REQ_TYPE) forbidden by settings."
+                local BLOCK_MSG="UPDATE BLOCKED | $DOMAIN requires $REQ_TYPE mode but CHANGE_DNS_RECORDS is false."
+                echo "⚠️ $BLOCK_MSG"
+                unraid_notify "$BLOCK_MSG" "warning"
+                echo "$CURRENT_IP" > "$IP_CACHE"
                 return 0
             fi
-            # If Types match, we proceed to update the IP.
         fi
-        # -----------------------
 
         local SHOULD_NOTIFY=false
         local MSG=""
@@ -186,25 +184,22 @@ main() {
         else
             echo "🆙 Updating existing record..."
             METHOD="PUT"; TARGET_ID="$CF_ID"
-            # SHOULD_NOTIFY stays false for standard IP updates
         fi
         
         RES=$(upsert_record "$METHOD" "$TARGET_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
         
         if [[ "$RES" == *"\"success\":true"* ]]; then
+            echo "✅ Success"
             echo "$CURRENT_IP" > "$IP_CACHE"
-            # ONLY notify if it was a NEW record or a TYPE switch
-            if [ "$SHOULD_NOTIFY" = true ]; then
-                unraid_notify "$MSG" "success"
-            fi
+            [ "$SHOULD_NOTIFY" = true ] && unraid_notify "$MSG" "success"
         else
             ERR=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
             echo "❌ Update Failed: $ERR"
             unraid_notify "Cloudflare Error | Domain: $DOMAIN | Message: $ERR" "warning"
         fi
     else
+        echo "✅ Cloudflare matches. Syncing local cache."
         echo "$CURRENT_IP" > "$IP_CACHE"
-        [ "$DEBUG" = "true" ] && echo "✅ DNS is already correct."
     fi
 }
 
