@@ -135,17 +135,27 @@ main() {
     CURRENT_IP=$(get_public_ip)
     [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
 
-    # 1. FAST CACHE CHECK
+    # FAST CACHE CHECK
     if [ "$DEBUG" != "true" ] && [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
-        echo "✅ IP unchanged ($CURRENT_IP). Skipping API."
+        echo "✅ IP unchanged: $CURRENT_IP"
         return 0
     fi
 
-    # 2. SYNC WITH CLOUDFLARE
-    echo "🌐 IP Change detected ($CURRENT_IP). Syncing with Cloudflare..."
+   # ENHANCED CACHE & IP CHECK
+    if [[ -f "$IP_CACHE" ]]; then
+        OLD_IP=$(cat "$IP_CACHE")
+        if [[ "$OLD_IP" == "$CURRENT_IP" ]]; then
+            [ "$DEBUG" != "true" ] && echo "✅ IP unchanged: $CURRENT_IP" && return 0
+        else
+            echo "🔄 IP Change detected: $OLD_IP ⮕ $CURRENT_IP"
+        fi
+    else
+        echo "🆕 IP Cached: $CURRENT_IP"
+    fi
+
+    # SYNC WITH CLOUDFLARE
     IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
 
-    # RESTORED: Explicit Mode Logging
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
         echo "🔒 Mode: CGNAT (CNAME required)"
@@ -155,7 +165,7 @@ main() {
         echo "🌐 Mode: Public (A record required)"
     fi
 
-    # 3. COMPARE AND UPDATE
+    # COMPARE AND UPDATE
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
         if [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ] && [ "$CF_TYPE" != "$REQ_TYPE" ]; then
@@ -182,7 +192,6 @@ main() {
         else
             echo "🆙 Updating IP address..."
             METHOD="PUT"; TARGET_ID="$CF_ID"
-            # Standard IP updates remain silent as per your previous request
         fi
         
         RES=$(upsert_record "$METHOD" "$TARGET_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
