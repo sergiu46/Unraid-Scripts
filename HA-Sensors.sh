@@ -27,8 +27,8 @@
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/HA-Sensors.sh"
 #
 # # Download and execute script
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR" && rm -rf "$SENSORS_DIR"
 # mkdir -p "$DIR"
-# [[ "$DEBUG" == "true" ]] && rm -f "$SCRIPT" && rm -rf "$SENSORS_DIR"
 # [[ -f "$SCRIPT" ]] || \
 #     curl -s -fL "$URL" -o "$SCRIPT" || \
 #     { echo "❌ Download Failed"; exit 1; }
