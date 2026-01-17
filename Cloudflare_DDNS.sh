@@ -8,20 +8,23 @@
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
 #
+# # --- AUTHENTICATION ---
 # CF_API_TOKEN="YOUR_TOKEN"
 # ZONE_ID="YOUR_ZONE_ID"
-# DOMAIN="example.com" or "*.example.com"
-# TUNNEL="your-id.cfargotunnel.com"
+# DOMAIN="example.com"
 #
-# # HOME NETWORK
+# # --- NETWORK SETTINGS ---
 # HOME_ROUTER_IP="192.168.1.1"
-#
-# # OPTIONS (Use "true" to enable)
+# TUNNEL="your-id.cfargotunnel.com"
 # PROXIED="false"
-# CHANGE_DNS_RECORDS="true"
-# CACHE_DIR="/dev/shm/Cloudflare"
-# DEBUG="true"
 #
+# # --- BEHAVIOR ---
+# CHANGE_DNS_RECORDS="true"  # "true" = Full Auto. "false" = Update IP only, BLOCK Mode Switches (A <-> CNAME).
+# NOTIFICATION_TYPE="all"    # Options: "all", "error", "none"
+# DEBUG="true"               # Set to "false" for daily use
+#
+# # --- SYSTEM ---
+# CACHE_DIR="/dev/shm/Cloudflare"
 # DIR="/dev/shm/scripts"
 # SCRIPT="$DIR/Cloudflare_DDNS.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
@@ -106,17 +109,15 @@ upsert_record() {
         --data "{\"type\":\"$type\",\"name\":\"$DOMAIN\",\"content\":\"$content\",\"ttl\":1,\"proxied\":$proxy}"
 }
 
-#!/usr/bin/env bash
-
-# ==========================================
-# UNRAID NOTIFICATION FUNCTION
-# ==========================================
 unraid_notify() {
     local message="$1"
     local flag="$2" # "success" or "warning"
 
-    [[ "$notification_type" == "none" ]] && return 0
-    [[ "$notification_type" == "error" && "$flag" == "success" ]] && return 0
+    # Default to "all" if variable is missing
+    local mode="${NOTIFICATION_TYPE:-all}"
+
+    [[ "$mode" == "none" ]] && return 0
+    [[ "$mode" == "error" && "$flag" == "success" ]] && return 0
 
     local severity="normal"
     [[ "$flag" == "warning" ]] && severity="warning"
@@ -158,7 +159,16 @@ main() {
     # API Sync Logic
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
-        [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ] && return 0
+        # --- SAFE MODE LOGIC ---
+        # If CHANGE_DNS_RECORDS is false, we only allow updates if the TYPE matches.
+        if [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ]; then
+            if [ "$CF_TYPE" != "$REQ_TYPE" ]; then
+                echo "⚠️ Update Blocked: Mode Switch ($CF_TYPE -> $REQ_TYPE) forbidden by settings."
+                return 0
+            fi
+            # If Types match, we proceed to update the IP.
+        fi
+        # -----------------------
 
         local SHOULD_NOTIFY=false
         local MSG=""
@@ -166,13 +176,13 @@ main() {
         if [ "$CF_ID" == "null" ]; then
             echo "🆕 Creating new record..."
             METHOD="POST"; TARGET_ID=""; SHOULD_NOTIFY=true
-            MSG="Created new $REQ_TYPE record for $DOMAIN (IP: $CURRENT_IP)."
+            MSG="NEW RECORD | Domain: $DOMAIN | Type: $REQ_TYPE | IP: $CURRENT_IP"
         elif [ "$CF_TYPE" != "$REQ_TYPE" ]; then
             echo "🔄 Type change detected. Recreating..."
             curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$CF_ID" \
                  -H "Authorization: Bearer $CF_API_TOKEN" > /dev/null
             METHOD="POST"; TARGET_ID=""; SHOULD_NOTIFY=true
-            MSG="Switched $DOMAIN to $REQ_TYPE mode (IP: $CURRENT_IP)."
+            MSG="TYPE SWITCH | Domain: $DOMAIN | Type: $REQ_TYPE | IP: $CURRENT_IP"
         else
             echo "🆙 Updating existing record..."
             METHOD="PUT"; TARGET_ID="$CF_ID"
@@ -190,7 +200,7 @@ main() {
         else
             ERR=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
             echo "❌ Update Failed: $ERR"
-            unraid_notify "Cloudflare Update Failed for $DOMAIN: $ERR" "warning"
+            unraid_notify "Cloudflare Error | Domain: $DOMAIN | Message: $ERR" "warning"
         fi
     else
         echo "$CURRENT_IP" > "$IP_CACHE"
