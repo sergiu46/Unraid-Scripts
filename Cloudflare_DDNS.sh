@@ -125,17 +125,17 @@ main() {
     # 2. ALWAYS show if the cache matches (Production Mode)
     if [ "$DEBUG" != "true" ]; then
         if [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
-            echo "✅ IP unchanged: $CURRENT_IP."
+            echo "✅ IP unchanged: $CURRENT_IP"
             exit 0
         fi
     fi
 
     # Determine required state
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
-        echo "🔒 Mode: CGNAT. IP: $CURRENT_IP."
+        echo "🔒 Mode: CGNAT. IP: $CURRENT_IP"
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
     else
-        echo "🌐 Mode: Public. IP: $CURRENT_IP."
+        echo "🌐 Mode: Public. IP: $CURRENT_IP"
         REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
         [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
     fi
