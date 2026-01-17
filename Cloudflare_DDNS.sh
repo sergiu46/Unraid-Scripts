@@ -1,4 +1,4 @@
-#########################################################################
+f#########################################################################
 # CLOUDFLARE DDNS
 # 
 # HOW TO USE:
@@ -11,7 +11,7 @@
 # CF_API_TOKEN="YOUR_TOKEN"
 # ZONE_ID="YOUR_ZONE_ID"
 # DOMAIN="example.com" or "*.example.com"
-# TUNNEL_TARGET="your-id.cfargotunnel.com"
+# TUNNEL="your-id.cfargotunnel.com"
 #
 # # HOME NETWORK
 # HOME_ROUTER_IP="192.168.1.1"
@@ -121,7 +121,7 @@ main() {
     # Determine required state
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
         echo "🔒 Mode: CGNAT. IP: $CURRENT_IP."
-        REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL_TARGET"; REQ_PROXY="true"
+        REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
     else
         echo "🌐 Mode: Public. IP: $CURRENT_IP."
         REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
