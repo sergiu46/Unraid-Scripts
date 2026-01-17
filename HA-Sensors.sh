@@ -38,7 +38,7 @@
 
 #!/bin/bash
 
-echo
+echo "🏠 Updating Home Assistant Sensors!"
 # Create sensors directory
 mkdir -p "${SENSORS_DIR}"
 
