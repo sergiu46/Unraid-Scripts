@@ -109,7 +109,6 @@ unraid_notify() {
     local message="$1"
     local flag="$2" 
 
-    # Handle case-sensitivity for the loader variable
     local mode="${NOTIFICATION_TYPE:-${notification_type:-all}}"
     
     [[ "$mode" == "none" ]] && return 0
@@ -131,8 +130,6 @@ unraid_notify() {
 # ==========================================
 main() {
     echo "🔍 DDNS Check: $DOMAIN"
-    
-    # Force refresh if Debug is on
     [ "$DEBUG" = "true" ] && rm -f "$IP_CACHE"
 
     CURRENT_IP=$(get_public_ip)
@@ -145,20 +142,22 @@ main() {
     fi
 
     # 2. SYNC WITH CLOUDFLARE
-    echo "🌐 Syncing $DOMAIN with Cloudflare..."
+    echo "🌐 IP Change detected ($CURRENT_IP). Syncing with Cloudflare..."
     IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
 
+    # RESTORED: Explicit Mode Logging
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
+        echo "🔒 Mode: CGNAT (CNAME required)"
     else
         REQ_TYPE="A"; REQ_CONTENT="$CURRENT_IP"
         [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
+        echo "🌐 Mode: Public (A record required)"
     fi
 
     # 3. COMPARE AND UPDATE
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
-        # --- SAFE MODE CHECK ---
         if [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ] && [ "$CF_TYPE" != "$REQ_TYPE" ]; then
             local BLOCK_MSG="UPDATE BLOCKED | $DOMAIN requires $REQ_TYPE mode but Safe Mode is ON."
             echo "⚠️ $BLOCK_MSG"
@@ -181,15 +180,15 @@ main() {
             METHOD="POST"; TARGET_ID=""; SHOULD_NOTIFY=true
             MSG="TYPE SWITCH | $DOMAIN | Type: $REQ_TYPE | IP: $CURRENT_IP"
         else
-            echo "🆙 Updating IP..."
+            echo "🆙 Updating IP address..."
             METHOD="PUT"; TARGET_ID="$CF_ID"
-            # SHOULD_NOTIFY stays false for standard IP updates per your request
+            # Standard IP updates remain silent as per your previous request
         fi
         
         RES=$(upsert_record "$METHOD" "$TARGET_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
         
         if [[ "$RES" == *"\"success\":true"* ]]; then
-            echo "✅ Cloudflare updated."
+            echo "✅ Cloudflare updated successfully."
             echo "$CURRENT_IP" > "$IP_CACHE"
             [ "$SHOULD_NOTIFY" = true ] && unraid_notify "$MSG" "success"
         else
@@ -198,7 +197,7 @@ main() {
             unraid_notify "Cloudflare Error | $DOMAIN | $ERR" "warning"
         fi
     else
-        echo "✅ Already correct."
+        echo "✅ Cloudflare already matches current state."
         echo "$CURRENT_IP" > "$IP_CACHE"
     fi
 }
