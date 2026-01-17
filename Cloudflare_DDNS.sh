@@ -196,7 +196,3 @@ main() {
 
 main
 echo ""
-
-main
-
-echo ""
