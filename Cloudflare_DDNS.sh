@@ -37,7 +37,7 @@
 
 
 #!/bin/bash
-
+echo
 # Cache Setup
 SAFE_NAME=$(echo "$DOMAIN" | sed 's/\*/wildcard/g; s/\./_/g')
 IP_CACHE="$CACHE_DIR/${SAFE_NAME}.ip"
@@ -166,3 +166,4 @@ main() {
 }
 
 main
+echo
