@@ -112,9 +112,6 @@ send_notification() {
     local req_type=$3
     local ip=$4
 
-    # Check if notification binary exists
-    [ ! -f "/usr/local/sbin/unraid-notification" ] && return
-
     local subject=""
     local message=""
 
