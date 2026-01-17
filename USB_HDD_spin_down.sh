@@ -116,5 +116,5 @@ do
     do_device ${device_id}
 done
 
-echo
+echo ""
 
