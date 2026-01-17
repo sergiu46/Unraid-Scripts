@@ -67,16 +67,28 @@ is_cgnat() {
     local ip=$1
     local trace=$(traceroute -n -m 2 -q 1 "$ip" 2>/dev/null)
     debug_log "Traceroute result:\n$trace"
+    
+    # Get the IP from the first hop line
+    local first_hop=$(echo "$trace" | awk 'NR==2 {print $2}')
+    debug_log "First hop detected: $first_hop"
+
+    # If the first hop IS our public IP, it's definitely Public.
+    if [[ "$first_hop" == "$ip" ]]; then
+        debug_log "Direct public hop detected. Skipping CGNAT checks."
+        return 1 # False (Is not CGNAT)
+    fi
+
     local found_ips=$(echo "$trace" | grep -oE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b")
     for found in $found_ips; do
         [[ "$found" == "$HOME_ROUTER_IP" ]] && continue
         if [[ $found =~ ^10\. ]] || [[ $found =~ ^192\.168\. ]] || \
            [[ $found =~ ^172\.(1[6-9]|2[0-9]|3[0-1])\. ]] || \
            [[ $found =~ ^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\. ]]; then
-            return 0 
+            debug_log "Private signature found: $found"
+            return 0 # True (Is CGNAT)
         fi
     done
-    return 1 
+    return 1 # False
 }
 
 get_cloudflare_state() {
