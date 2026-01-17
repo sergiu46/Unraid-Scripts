@@ -112,4 +112,4 @@ do
     drive_temp_state "${device_id}"
 done
 
-echo
+echo ""
