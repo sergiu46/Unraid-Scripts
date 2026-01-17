@@ -111,7 +111,6 @@ upsert_record() {
 # ==========================================
 
 main() {
-    # 1. ALWAYS show the start of the check
     echo "🔍 DDNS Check: $DOMAIN"
     
     if [ "$DEBUG" = "true" ]; then
@@ -120,9 +119,11 @@ main() {
     fi
 
     CURRENT_IP=$(get_public_ip)
-    [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
+    [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1 2>/dev/null || exit 1; }
 
-    # 2. ALWAYS show if the cache matches (Production Mode)
+    # API Sync - Get current state
+    IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
+
     if [ "$DEBUG" != "true" ]; then
         if [[ -f "$IP_CACHE" ]] && [[ "$(cat "$IP_CACHE")" == "$CURRENT_IP" ]]; then
             echo "✅ IP unchanged: $CURRENT_IP"
@@ -140,32 +141,46 @@ main() {
         [ "$PROXIED" = "true" ] && REQ_PROXY="true" || REQ_PROXY="false"
     fi
 
-    # API Sync
-    IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
-    
     SUCCESS=false
+    # Check if update is needed
     if [ "$CF_ID" == "null" ] || [ "$CF_TYPE" != "$REQ_TYPE" ] || [ "$CF_CONTENT" != "$REQ_CONTENT" ] || [ "$CF_PROXIED" != "$REQ_PROXY" ]; then
         
-        if [ "$CHANGE_DNS_RECORDS" != "true" ]; then
+        if [ "$CHANGE_DNS_RECORDS" != "true" ] && [ "$CF_ID" != "null" ]; then
             echo "⚠️ Mismatch detected, but CHANGE_DNS_RECORDS is not 'true'."
-            echo "ℹ️  Cloudflare remains: $CF_TYPE -> $CF_CONTENT"
-            echo "ℹ️  Detection found: $REQ_TYPE -> $REQ_CONTENT"
             return 0
         fi
 
-        echo "🆙 Updating Cloudflare..."
-        if [ "$CF_TYPE" != "$REQ_TYPE" ] && [ "$CF_ID" != "null" ]; then
+        # Determine Method: POST for new records, PUT for updates, or DELETE/POST for type changes
+        if [ "$CF_ID" == "null" ]; then
+            echo "🆕 Creating new record on Cloudflare..."
+            METHOD="POST"
+            TARGET_ID="" # Leave empty for POST
+        elif [ "$CF_TYPE" != "$REQ_TYPE" ]; then
+            echo "🔄 Type change detected ($CF_TYPE -> $REQ_TYPE). Recreating..."
             curl -s -X DELETE "https://api.cloudflare.com/client/v4/zones/$ZONE_ID/dns_records/$CF_ID" \
                  -H "Authorization: Bearer $CF_API_TOKEN" > /dev/null
-            CF_ID=""; METHOD="POST"
+            METHOD="POST"
+            TARGET_ID=""
         else
+            echo "🆙 Updating existing Cloudflare record..."
             METHOD="PUT"
+            TARGET_ID="$CF_ID"
         fi
         
-        RES=$(upsert_record "$METHOD" "$CF_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
-        [[ "$RES" == *"\"success\":true"* ]] && SUCCESS=true
+        RES=$(upsert_record "$METHOD" "$TARGET_ID" "$REQ_TYPE" "$REQ_CONTENT" "$REQ_PROXY")
+        
+        if [[ "$RES" == *"\"success\":true"* ]]; then
+            SUCCESS=true
+            # Notify on Type Change or New Record
+            if [ "$CF_TYPE" != "$REQ_TYPE" ]; then
+                MSG="Network change for $DOMAIN. Mode: $REQ_TYPE (IP: $CURRENT_IP)."
+                [ "$CF_ID" == "null" ] && MSG="Created new $REQ_TYPE record for $DOMAIN."
+                
+                [ -f "/usr/local/sbin/unraid-notification" ] && /usr/local/sbin/unraid-notification \
+                -p "Cloudflare DDNS" -s "DNS Updated" -d "$MSG" -i "normal"
+            fi
+        fi
     else
-        # Only show this if we are specifically troubleshooting
         [ "$DEBUG" = "true" ] && echo "✅ DNS is already correct."
         SUCCESS=true
     fi
@@ -173,9 +188,14 @@ main() {
     if [ "$SUCCESS" = true ]; then
         echo "$CURRENT_IP" > "$IP_CACHE"
     else
-        echo "❌ Update Failed: $RES"
+        # Clean up the error message for the log
+        ERR_MSG=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
+        echo -e "❌ Update Failed: $ERR_MSG"
     fi
 }
+
+main
+echo ""
 
 main
 
