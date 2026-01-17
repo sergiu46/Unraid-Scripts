@@ -189,8 +189,8 @@ main() {
         echo "$CURRENT_IP" > "$IP_CACHE"
     else
         # Clean up the error message for the log
-        ERR_MSG=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
-        echo -e "❌ Update Failed: $ERR_MSG"
+        #ERR_MSG=$(echo "$RES" | jq -r '.errors[0].message // "Unknown Error"')
+        echo -e "❌ Update Failed: $RES"
     fi
 }
 
