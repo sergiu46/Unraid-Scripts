@@ -1,5 +1,5 @@
 ##################################################################
-# ZFS backup using snapshots and replication to a local and remote pool.
+# Rsync backup to a remote host.
 # 
 # HOW TO USE:
 # Create a new "User Script" in Unraid and paste the code below.
@@ -9,9 +9,9 @@
 #
 # # List only the local folders you want to back up
 # LOCAL_FOLDERS=(
-#     "/mnt/user/Pictures"
-#     "/mnt/user/Movies"
-#     "/mnt/user/Personal"
+#      "/mnt/user/Pictures"
+#      "/mnt/user/Movies"
+#      "/mnt/user/Personal"
 # )
 #
 # # CONFIGURATION
@@ -49,14 +49,25 @@ unraid_notify() {
     local message="$2"
     local severity="$3" 
     local bubble="$4"
+    
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
+        # SHORT VERSION for WebUI (prevents cutoff/quotes)
+        local web_msg="Rsync Backup Complete. See logs for details."
+        
+        # FULL VERSION for Telegram/Email agents
+        # Uses the -m flag for the long multi-line report
+        /usr/local/emhttp/webGui/scripts/notify \
+            -i "$severity" \
+            -s "$bubble $title_msg" \
+            -d "$web_msg" \
+            -m "$(printf "%b" "$message")"
     fi
 }
 
 # --- MAIN EXECUTION ---
 echo "🛠️ Rsync Backup Started at $(date +%H:%M:%S)"
 echo ""
+
 # 1. Verification Handshake
 echo "🌐 Connecting to $REMOTE_HOST and verifying destination..."
 if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
@@ -74,8 +85,8 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     
     if [ ! -d "$FOLDER" ]; then
         echo "⚠️  Skipping: $FOLDER (Local path not found)"
-        SUMMARY_LOG+="📂 $FOLDER_NAME | ⏭️  Not Found
-"
+        # Use \n for Telegram spacing
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ⏭️  Not Found\n"
         ((FAILURE_TOTAL++))
         continue
     fi
@@ -83,24 +94,23 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     echo "📂 Folder: $FOLDER_NAME"
     echo "🚀 Syncing to $REMOTE_HOST"
     echo ""
+    
     # Mirror the local folder to the remote base directory
     rsync -av --delete --timeout=30 "$FOLDER" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
     
     if [ $? -eq 0 ]; then
         echo ""
         echo "✅ Sync successful."
-        SUMMARY_LOG+="📂 $FOLDER_NAME | ✅ Success
-"
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ✅ Success\n"
         ((SUCCESS_TOTAL++))
     else
         echo "❌ Sync failed."
-        SUMMARY_LOG+="📂 $FOLDER_NAME | ❌ Rsync Error
-"
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ❌ Rsync Error\n"
         ((FAILURE_TOTAL++))
     fi
 done
 
-# 3. Report
+# 3. Report Generation
 NOTIFY_TITLE="Rsync Backup Report"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
@@ -119,4 +129,7 @@ echo "📊 FINAL SUMMARY:"
 echo -e "$SUMMARY_LOG"
 echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
 echo ""
-unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+
+# Final Notification Trigger
+# We add the leading \n here to ensure Telegram has that empty row after the title
+unraid_notify "$NOTIFY_TITLE" "\n$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
