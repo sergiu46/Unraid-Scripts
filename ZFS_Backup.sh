@@ -51,7 +51,6 @@
 #
 ##################################################################
 
-
 #!/bin/bash
 
 # TRACKING VARIABLES
@@ -151,6 +150,8 @@ for DS in "${DATASETS[@]}"; do
                 rm -rf "$DST_RAM_LOCAL"
                 echo "🧹 Rotating manual snapshots on local backup..."
                 zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+            else
+                local_stat=3
             fi
         fi
     fi
@@ -164,22 +165,36 @@ for DS in "${DATASETS[@]}"; do
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
                 echo "✅ Remote sync successful."
                 remote_stat=1
+            else
+                remote_stat=3
             fi
         fi
     fi
 
-    # 4. Icon Logic
-    L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || { [[ $local_stat -eq 2 ]] && L_ICON="⏭️" || L_ICON="❌"; }; }
-    R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || { [[ $remote_stat -eq 2 ]] && R_ICON="⏭️" || R_ICON="❌"; }; }
+    # 4. Icon & Text Logic for Notification
+    case $local_stat in
+        1) L_RES="✅ Success" ;;
+        2) L_RES="⏭️ Skipped" ;;
+        3) L_RES="❌ Failed"  ;;
+        *) L_RES="➖ Disabled" ;;
+    esac
+
+    case $remote_stat in
+        1) R_RES="✅ Success" ;;
+        2) R_RES="⏭️ Skipped" ;;
+        3) R_RES="❌ Failed"  ;;
+        *) R_RES="➖ Disabled" ;;
+    esac
     
-    # 5. Build Multi-line "Card" Summary
-    SUMMARY_LOG+="📦 $DS
-💾 Local $L_ICON | ☁️ Remote $R_ICON
+    # 5. Build Multi-line Summary (Card Style)
+    SUMMARY_LOG+="📦 Dataset: $DS
+↳ 💾 Local: $L_RES
+↳ ☁️ Remote: $R_RES
 
 "
 
     # 6. Source Maintenance
-    if [[ $local_stat -ge 1 || $remote_stat -ge 1 ]]; then
+    if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
@@ -208,4 +223,5 @@ fi
 echo "----------------------------------------------------"
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
+echo ""
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
