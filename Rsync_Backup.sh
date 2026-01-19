@@ -55,7 +55,7 @@ unraid_notify() {
 }
 
 # --- MAIN EXECUTION ---
-echo "🛠️ Remote Rsync Backup Started - $(date +%Y-%m-%d\ %H:%M:%S)"
+echo "🛠️ Rsync Backup Started at $(date +%H:%M:%S)"
 echo ""
 # 1. Verification Handshake
 echo "🌐 Connecting to $REMOTE_HOST and verifying destination..."
