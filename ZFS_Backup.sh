@@ -227,6 +227,7 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
     fi
 fi
 echo "----------------------------------------------------"
+echo ""
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo ""
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
