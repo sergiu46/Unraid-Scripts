@@ -101,11 +101,11 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     if [ $? -eq 0 ]; then
         echo ""
         echo "✅ Sync successful."
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ✅ Success\n"
+        SUMMARY_LOG+="📂 $FOLDER_NAME\n↳ ✅ Success\n"
         ((SUCCESS_TOTAL++))
     else
         echo "❌ Sync failed."
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ❌ Rsync Error\n"
+        SUMMARY_LOG+="📂 $FOLDER_NAME\n↳ ❌ Rsync Error\n"
         ((FAILURE_TOTAL++))
     fi
 done
