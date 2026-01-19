@@ -59,11 +59,11 @@ SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
-
 # FUNCTIONS
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
+        # EliteDesk removed as it is handled by the OS
         /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
 }
@@ -118,7 +118,6 @@ replicate_with_repair() {
     return 0
 }
 
-
 # MAIN EXECUTION
 echo "🛠️ ZFS Backup Started at $(date +%H:%M:%S)"
 echo ""
@@ -169,15 +168,17 @@ for DS in "${DATASETS[@]}"; do
         fi
     fi
 
-    # 4. Icon Logic for Aggregated Notification
+    # 4. Icon Logic
     L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || { [[ $local_stat -eq 2 ]] && L_ICON="⏭️" || L_ICON="❌"; }; }
     R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || { [[ $remote_stat -eq 2 ]] && R_ICON="⏭️" || R_ICON="❌"; }; }
     
-    # Building the literal newline string for Unraid UI
-    SUMMARY_LOG+="📦 $DS | 💾 $L_ICON | ☁️ $R_ICON
+    # 5. Build Multi-line "Card" Summary
+    SUMMARY_LOG+="📦 $DS
+💾 Local $L_ICON | ☁️ Remote $R_ICON
+
 "
 
-    # 5. Source Maintenance
+    # 6. Source Maintenance
     if [[ $local_stat -ge 1 || $remote_stat -ge 1 ]]; then
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
@@ -205,9 +206,6 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
 fi
 
 echo "----------------------------------------------------"
-echo ""
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
-echo ""
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
-echo ""
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
