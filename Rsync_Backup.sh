@@ -55,16 +55,13 @@ unraid_notify() {
     fi
 }
 
-check_tailscale() {
-    echo "🌐 Checking Tailscale reachability for $REMOTE_HOST..."
-    
-    # tailscale ping is more reliable than grep status
-    # It handles IP, MagicDNS, and Short Names automatically
-    if tailscale ping -c 1 --timeout 3s "$REMOTE_HOST" > /dev/null 2>&1; then
-        echo "✅ Tailscale connection confirmed."
+check_connectivity() {
+    echo "🌐 Testing SSH connection to $REMOTE_HOST..."
+    if ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "true" > /dev/null 2>&1; then
+        echo "✅ Connection successful."
         return 0
     else
-        echo "❌ Tailscale ping failed. Host is unreachable."
+        echo "❌ Connection failed. Host may be offline or SSH keys not accepted."
         return 1
     fi
 }
