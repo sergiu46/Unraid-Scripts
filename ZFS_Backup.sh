@@ -62,13 +62,18 @@ SUMMARY_LOG=""
 
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
+    
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # We pass the formatted message directly to -d. 
-        # Using printf ensures Unraid receives actual line breaks.
+        # SHORT VERSION for WebUI (prevents cutoff/quotes)
+        local web_msg="ZFS Backup Complete. See logs for details."
+        
+        # FULL VERSION for Telegram/Email agents
+        # The Unraid PHP agent handles the -m flag for long messages.
         /usr/local/emhttp/webGui/scripts/notify \
             -i "$severity" \
             -s "$bubble $title_msg" \
-            -d "$(printf "%b" "$message")"
+            -d "$web_msg" \
+            -m "$(printf "%b" "$message")"
     fi
 }
 
@@ -192,9 +197,8 @@ for DS in "${DATASETS[@]}"; do
     esac
     
     # 5. Build Multi-line Card Summary
-    # Using \n for formatting. Note: Telegram needs the leading gap, 
-    # but we will handle that in the final trigger.
-    SUMMARY_LOG+="📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n\n"
+    # Using \n for Telegram/Detailed view
+    SUMMARY_LOG+="\n📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
 
     # 6. Source Maintenance
     if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
@@ -227,6 +231,5 @@ echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
 
 # Final Notification Trigger
-# We add the leading \n here so Telegram gets the gap, but the WebUI 
-# doesn't see a "leading" newline in the variable which causes the quote bug.
-unraid_notify "$NOTIFY_TITLE" "\n$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+# Passes the SUMMARY_LOG to the detailed message field
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
