@@ -53,27 +53,32 @@
 
 #!/bin/bash
 
-# TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
+# # # # # # # # # # # # # # # # #
+#  NOTIFICATIONS                #
+# # # # # # # # # # # # # # # # #
+
 unraid_notify() {
     local title_msg="$1"
-    local message="$2"
+    local message="$2" # This now contains actual literal newlines
     local severity="$3" 
     local bubble="$4"
 
-    local clean_message=$(echo -e "$message")
-
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$clean_message" -i "$severity"
+        # Passing the message without 'echo -e' because we are building it with literal breaks now
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
 }
 
+# # # # # # # # # # # # # # # # #
+#  UTILITIES                    #
+# # # # # # # # # # # # # # # # #
+
 contains_element() {
-    local e match="$1"
-    shift
+    local e match="$1"; shift
     for e; do [[ "$e" == "$match" ]] && return 0; done
     return 1
 }
@@ -83,7 +88,6 @@ create_sanoid_config() {
     local config_dir="$2"
     mkdir -p "$config_dir"
     cp /etc/sanoid/sanoid.defaults.conf "$config_dir/sanoid.defaults.conf"
-
     cat <<EOF > "$config_dir/sanoid.conf"
 [$target_path]
     use_template = production
@@ -104,55 +108,43 @@ replicate_with_repair() {
     local src="$2"
     local dest_parent="$3"
     local ds_name="$4"
-
     local dest_full_path="${dest_parent}/${ds_name}"
     local target="$dest_full_path"
     [[ "$mode" == "remote" ]] && target="${REMOTE_USER}@${REMOTE_HOST}:${dest_full_path}"
 
-    echo "🚀 Replicating ($mode) to $target..."
-    
     /usr/local/sbin/syncoid -r --no-sync-snap --force-delete "$src" "$target"
     local status=$?
 
     if [ $status -ne 0 ]; then
-        echo "⚠️ Sync failed ($mode). Dataset may be out of sync or busy."
-        
         if [[ "$mode" == "local" ]]; then
-            echo "🚨 Clearing local locks and destroying $dest_full_path..."
             zfs receive -A "$dest_full_path" 2>/dev/null
             zfs destroy -r "$dest_full_path"
         else
-            echo "🚨 Clearing remote locks and destroying $dest_full_path..."
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs receive -A $dest_full_path 2>/dev/null; zfs destroy -r $dest_full_path"
         fi
-        
-        echo "🔄 Starting fresh full backup to $target..."
         /usr/local/sbin/syncoid -r --no-sync-snap "$src" "$target"
         return $?
     fi
     return 0
 }
 
-
-# MAIN EXECUTION LOOP
+# # # # # # # # # # # # # # # # #
+#  MAIN EXECUTION LOOP          #
+# # # # # # # # # # # # # # # # #
 
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
     TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
     MANUAL_SNAP="manual_sync_$TIMESTAMP"
     
-    echo "----------------------------------------------------"
-    echo "📦 Dataset: $SRC_DS"
-
     zfs snapshot -r "$SRC_DS@$MANUAL_SNAP"
 
     local_stat=0 # 0=Fail, 1=Success, 2=Excluded
     remote_stat=0
 
-    # Local Backup
+    # Local
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
-            echo "⏭️ Skipping Local (Excluded)"
             local_stat=2
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
@@ -162,17 +154,14 @@ for DS in "${DATASETS[@]}"; do
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
                 rm -rf "$DST_RAM_LOCAL"
-                
-                echo "🧹 Rotating manual snapshots on local backup..."
                 zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
             fi
         fi
     fi
 
-    # Remote Backup
+    # Remote
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
-            echo "⏭️ Skipping Remote (Excluded)"
             remote_stat=2
         else
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
@@ -181,15 +170,16 @@ for DS in "${DATASETS[@]}"; do
         fi
     fi
 
-    # Format Notification Icons
+    # --- Nicer Summary Formatting ---
     L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || { [[ $local_stat -eq 2 ]] && L_ICON="⏭️" || L_ICON="❌"; }; }
     R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || { [[ $remote_stat -eq 2 ]] && R_ICON="⏭️" || R_ICON="❌"; }; }
     
-    SUMMARY_LOG+="$DS: local $L_ICON remote $R_ICON\n"
+    # We build the string with a literal newline inside the quotes
+    SUMMARY_LOG+="📦 $DS | 💾 $L_ICON | ☁️ $R_ICON
+"
 
     # Source Cleanup
     if [[ $local_stat -ge 1 || $remote_stat -ge 1 ]]; then
-        echo "✅ Backup success ($DS). Pruning source snapshots..."
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
@@ -197,14 +187,15 @@ for DS in "${DATASETS[@]}"; do
         rm -rf "$SRC_RAM"
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
     else
-        echo "❌ Backup failed for $DS."
         ((FAILURE_TOTAL++))
     fi
 done
 
-#  FINAL AGGREGATION
+# # # # # # # # # # # # # # # # #
+#  FINAL AGGREGATION            #
+# # # # # # # # # # # # # # # # #
 
-NOTIFY_TITLE="ZFS Backup"
+NOTIFY_TITLE="ZFS Backup Report"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
 
@@ -216,9 +207,8 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
     fi
 fi
 
+# Print summary to console
 echo -e "📊 Final Summary:\n$SUMMARY_LOG"
-unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
 
-echo "----------------------------------------------------"
-echo "🚀 ZFS Backup Finished."
-echo ""
+# Send notification (SUMMARY_LOG now contains actual line breaks)
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
