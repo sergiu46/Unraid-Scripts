@@ -49,80 +49,56 @@ unraid_notify() {
     local message="$2"
     local severity="$3" 
     local bubble="$4"
-    
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
         /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
 }
 
-check_connectivity() {
-    echo "🌐 Testing SSH connection to $REMOTE_HOST..."
-    if ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "true" > /dev/null 2>&1; then
-        echo "✅ Connection successful."
-        return 0
-    else
-        echo "❌ Connection failed. Host may be offline or SSH keys not accepted."
-        return 1
-    fi
-}
-
-backup_remote() {
-    local SRC="$1"
-    local FOLDER_NAME=$(basename "$SRC")
-    
-    echo "----------------------------------------------------"
-    echo "📦 Folder: $FOLDER_NAME"
-    echo ""
-    echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_HOST..."
-
-    if ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
-        
-        # Perform rsync
-        rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
-        
-        if [ $? -eq 0 ]; then
-            echo "✅ Sync successful."
-            SUMMARY_LOG+="📦 $FOLDER_NAME | ✅ Success
-"
-            ((SUCCESS_TOTAL++))
-        else
-            echo "❌ Sync failed during rsync."
-            SUMMARY_LOG+="📦 $FOLDER_NAME | ❌ Rsync Error
-"
-            ((FAILURE_TOTAL++))
-        fi
-    else
-        echo "❌ Connection failed (Check SSH Keys) or Remote directory missing."
-        SUMMARY_LOG+="📦 $FOLDER_NAME | 📂 Connection/Path Error
-"
-        ((FAILURE_TOTAL++))
-    fi
-}
-
-# MAIN EXECUTION
+# --- MAIN EXECUTION ---
 echo "🛠️ Remote Rsync Backup Started - $(date +%Y-%m-%d\ %H:%M:%S)"
 echo ""
-# 1. Connectivity Check
-# if ! check_tailscale; then
-#     echo "❌ Host $REMOTE_HOST is offline. Aborting."
-#     unraid_notify "Backup Aborted" "Tailscale cannot reach $REMOTE_HOST" "alert" "🔴"
-#     exit 1
-# fi
-
-# 2. Iterate through the folder list
+# 1. Verification Handshake
+echo "🌐 Connecting to $REMOTE_HOST and verifying destination..."
+if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
+    echo "❌ Connection failed or Remote Directory '$REMOTE_BASE_DIR' missing."
+    unraid_notify "Backup Aborted" "Cannot reach $REMOTE_HOST or destination path is missing." "alert" "🔴"
+    exit 1
+fi
+echo "✅ Remote path verified."
+echo ""
+# 2. Backup Loop
 for FOLDER in "${LOCAL_FOLDERS[@]}"; do
-    if [ -d "$FOLDER" ]; then
-        backup_remote "$FOLDER"
-    else
-        echo "----------------------------------------------------"
+    FOLDER_NAME=$(basename "$FOLDER")
+    echo "----------------------------------------------------"
+    
+    if [ ! -d "$FOLDER" ]; then
         echo "⚠️  Skipping: $FOLDER (Local path not found)"
-        SUMMARY_LOG+="📦 $(basename "$FOLDER") | ⏭️  Not Found
+        SUMMARY_LOG+="📦 $FOLDER_NAME | ⏭️  Not Found
+"
+        ((FAILURE_TOTAL++))
+        continue
+    fi
+
+    echo "📦 Folder: $FOLDER_NAME"
+    echo "🚀 Syncing to $REMOTE_HOST:$REMOTE_BASE_DIR..."
+    
+    # Mirror the local folder to the remote base directory
+    rsync -av --delete --timeout=30 "$FOLDER" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
+    
+    if [ $? -eq 0 ]; then
+        echo "✅ Sync successful."
+        SUMMARY_LOG+="📦 $FOLDER_NAME | ✅ Success
+"
+        ((SUCCESS_TOTAL++))
+    else
+        echo "❌ Sync failed."
+        SUMMARY_LOG+="📦 $FOLDER_NAME | ❌ Rsync Error
 "
         ((FAILURE_TOTAL++))
     fi
 done
 
-# 3. Determine Final Status
+# 3. Report
 NOTIFY_TITLE="Rsync Backup Report"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
@@ -135,11 +111,10 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
     fi
 fi
 
-# Print final logs to console
 echo "----------------------------------------------------"
+echo ""
 echo "📊 FINAL SUMMARY:"
 echo -e "$SUMMARY_LOG"
 echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
 echo ""
-# 4. Send the consolidated notification
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
