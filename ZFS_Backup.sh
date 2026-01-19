@@ -33,14 +33,14 @@
 # # System
 # DEBUG=true
 # SCRIPT_DIR="/dev/shm/scripts"
-# SCRIPT="$DIR/ZFS_Backup.sh"
+# SCRIPT="$SCRIPT_DIR/ZFS_Backup.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
 #
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
 # [[ -f "$SCRIPT" ]] || \
-#   curl -s -fL "$URL" -o "$SCRIPT" || \
-#   { echo "❌ Download Failed"; exit 1; }
+#    curl -s -fL "$URL" -o "$SCRIPT" || \
+#    { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT"
 #
 ##################################################################
@@ -107,9 +107,7 @@ replicate_with_repair() {
     return 0
 }
 
-
 #  MAIN EXECUTION LOGIC
-
 
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
@@ -127,12 +125,17 @@ for DS in "${DATASETS[@]}"; do
 
     # 2. Local Backup + Prune
     if [[ "$RUN_LOCAL" == "yes" ]]; then
+        LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
         if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
             local_stat=0
             DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
-            create_sanoid_config "${DEST_PARENT_LOCAL}/${DS}" "$DST_RAM_LOCAL"
+            create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
             /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
             rm -rf "$DST_RAM_LOCAL"
+
+            # 🧹 Rotation for Manual Snapshots on the BACKUP pool
+            echo "🧹 Rotating manual snapshots on local backup (keeping $KEEP_MANUAL)..."
+            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}
         fi
     fi
 
@@ -140,6 +143,7 @@ for DS in "${DATASETS[@]}"; do
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
             remote_stat=0
+            # Note: Remote rotation would require a remote ssh command similar to the zfs destroy above.
         fi
     fi
 
@@ -153,9 +157,8 @@ for DS in "${DATASETS[@]}"; do
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots --quiet
         rm -rf "$SRC_RAM"
 
-        # B. Manual Snapshot Rotation
-        # Lists manual snapshots, skips the newest X (KEEP_MANUAL), and deletes the rest
-        echo "🧹 Rotating manual snapshots (keeping $KEEP_MANUAL)..."
+        # B. Manual Snapshot Rotation on SOURCE
+        echo "🧹 Rotating manual snapshots on source (keeping $KEEP_MANUAL)..."
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}
         
         unraid_notify "✅ Success: $DS backed up." "normal"
