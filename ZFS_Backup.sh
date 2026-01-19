@@ -226,8 +226,9 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
         NOTIFY_SEVERITY="alert"; NOTIFY_BUBBLE="🔴"
     fi
 fi
-
+echo "----------------------------------------------------"
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
+echo ""
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
 echo ""
 # Final Notification Trigger
