@@ -229,7 +229,7 @@ fi
 
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
-
+echo ""
 # Final Notification Trigger
 # Passes the SUMMARY_LOG to the detailed message field
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
