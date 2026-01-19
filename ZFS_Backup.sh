@@ -82,10 +82,15 @@ create_sanoid_config() {
 [$target_path]
     use_template = production
     recursive = yes
+
 [template_production]
-    hourly = ${KEEP_HOURLY:-0}; daily = ${KEEP_DAILY:-0}; weekly = ${KEEP_WEEKLY:-0}
-    monthly = ${KEEP_MONTHLY:-0}; yearly = ${KEEP_YEARLY:-0}
-    autosnap = yes; autoprune = yes
+    hourly = ${KEEP_HOURLY:-0}
+    daily = ${KEEP_DAILY:-0}
+    weekly = ${KEEP_WEEKLY:-0}
+    monthly = ${KEEP_MONTHLY:-0}
+    yearly = ${KEEP_YEARLY:-0}
+    autosnap = yes
+    autoprune = yes
 EOF
 }
 
