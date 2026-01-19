@@ -65,7 +65,7 @@ unraid_notify() {
     
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
         # SHORT VERSION for WebUI (prevents cutoff/quotes)
-        local web_msg="ZFS Backup Complete. See logs for details."
+        local web_msg="Backup Complete. See logs for details."
         
         # FULL VERSION for Telegram/Email agents
         # The Unraid PHP agent handles the -m flag for long messages.
