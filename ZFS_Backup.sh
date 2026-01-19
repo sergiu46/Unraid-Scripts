@@ -56,15 +56,23 @@
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
-# Leading newline for Telegram spacing; printf will handle it for WebUI
-SUMMARY_LOG=$'\n'
+SUMMARY_LOG=""
 
 # FUNCTIONS
+
+# Optimized for Unraid PHP notification system
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # Use printf to properly interpret newlines and avoid leading quote issues in Unraid UI
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$(printf "%b" "$message")" -i "$severity"
+        # Separate the first line for the 'Description' field to avoid UI cutoff
+        # The rest goes into the 'Message' field which supports multi-line
+        local first_line=$(echo -e "$message" | grep "📦" | head -n 1)
+        
+        /usr/local/emhttp/webGui/scripts/notify \
+            -i "$severity" \
+            -s "$bubble $title_msg" \
+            -d "$first_line" \
+            -m "$message"
     fi
 }
 
@@ -188,11 +196,8 @@ for DS in "${DATASETS[@]}"; do
     esac
     
     # 5. Build Multi-line Card Summary
-    SUMMARY_LOG+="📦 Dataset: $DS
-↳ 💾 Local: $L_RES
-↳ ☁️ Remote: $R_RES
-
-"
+    # Using literal \n for PHP compatibility in Unraid WebUI
+    SUMMARY_LOG+="📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n\n"
 
     # 6. Source Maintenance
     if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
