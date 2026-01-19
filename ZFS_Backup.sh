@@ -64,8 +64,10 @@ unraid_notify() {
     local severity="$3" 
     local bubble="$4"
 
+    local clean_message=$(echo -e "$message")
+
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$clean_message" -i "$severity"
     fi
 }
 
