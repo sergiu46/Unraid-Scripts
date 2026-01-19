@@ -15,7 +15,7 @@
 # )
 #
 # # CONFIGURATION
-# REMOTE_HOST="unraid-fctpn.tail6592cc.ts.net"      # Your Tailscale IP
+# REMOTE_HOST="unraid.tail.ts.net"      # Your Tailscale IP
 # REMOTE_USER="root"
 # REMOTE_BASE_DIR="/mnt/user/Sergiu"
 #
@@ -35,8 +35,8 @@
 #    { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT"
 ##################################################################
-
 #!/bin/bash
+
 # --- INITIALIZATION ---
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
@@ -56,8 +56,11 @@ unraid_notify() {
 }
 
 check_tailscale() {
-    echo "🌐 Checking Tailscale connection to $REMOTE_IP..."
-    if tailscale status | grep -q "$REMOTE_IP"; then
+    # We use REMOTE_HOST now. We cut to the first part (hostname) to grep status safely.
+    local HOST_SHORT=$(echo "$REMOTE_HOST" | cut -d. -f1)
+    echo "🌐 Checking Tailscale connection to $HOST_SHORT..."
+    
+    if tailscale status | grep -q "$HOST_SHORT"; then
         echo "✅ Tailscale is online."
         return 0
     else
@@ -71,26 +74,30 @@ backup_remote() {
     
     echo "----------------------------------------------------"
     echo "📦 Folder: $FOLDER_NAME"
-    echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_IP..."
+    echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_HOST..."
 
     # Check if the remote base directory exists via SSH
-    if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_IP" "[ -d '$REMOTE_BASE_DIR' ]"; then
+    # Note: We use REMOTE_HOST here, not REMOTE_IP
+    if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
         
         # Perform rsync
-        rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_IP":"$REMOTE_BASE_DIR/"
+        rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
         
         if [ $? -eq 0 ]; then
             echo "✅ Sync successful."
-            SUMMARY_LOG+="📦 $FOLDER_NAME | ✅ Success"
+            SUMMARY_LOG+="📦 $FOLDER_NAME | ✅ Success
+"
             ((SUCCESS_TOTAL++))
         else
             echo "❌ Sync failed during rsync."
-            SUMMARY_LOG+="📦 $FOLDER_NAME | ❌ Rsync Error"
+            SUMMARY_LOG+="📦 $FOLDER_NAME | ❌ Rsync Error
+"
             ((FAILURE_TOTAL++))
         fi
     else
         echo "❌ Sync failed: Remote directory not found."
-        SUMMARY_LOG+="📦 $FOLDER_NAME | 📂 Remote Path Missing"
+        SUMMARY_LOG+="📦 $FOLDER_NAME | 📂 Remote Path Missing
+"
         ((FAILURE_TOTAL++))
     fi
 }
@@ -103,7 +110,7 @@ echo "🛠️ Remote Rsync Backup Started - $(date +%Y-%m-%d\ %H:%M:%S)"
 # 1. Connectivity Check
 if ! check_tailscale; then
     echo "❌ Tailscale is offline. Aborting."
-    unraid_notify "Backup Aborted" "Tailscale is not connected to $REMOTE_IP" "alert" "🔴"
+    unraid_notify "Backup Aborted" "Tailscale is not connected to $REMOTE_HOST" "alert" "🔴"
     exit 1
 fi
 
@@ -114,7 +121,8 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     else
         echo "----------------------------------------------------"
         echo "⚠️  Skipping: $FOLDER (Not found)"
-        SUMMARY_LOG+="📦 $(basename "$FOLDER") | ⏭️  Not Found"
+        SUMMARY_LOG+="📦 $(basename "$FOLDER") | ⏭️  Not Found
+"
         ((FAILURE_TOTAL++))
     fi
 done
@@ -137,7 +145,6 @@ echo "----------------------------------------------------"
 echo "📊 FINAL SUMMARY:"
 echo -e "$SUMMARY_LOG"
 echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
-
+echo ""
 # 4. Send the consolidated notification
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
-echo ""
