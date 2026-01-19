@@ -194,3 +194,4 @@ unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
 
 echo "----------------------------------------------------"
 echo "🚀 ZFS Backup Finished."
+echo ""
