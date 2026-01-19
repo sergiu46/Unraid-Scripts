@@ -51,31 +51,22 @@
 #
 ##################################################################
 
+
 #!/bin/bash
 
+# TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
-# # # # # # # # # # # # # # # # #
-#  NOTIFICATIONS                #
-# # # # # # # # # # # # # # # # #
 
+# FUNCTIONS
 unraid_notify() {
-    local title_msg="$1"
-    local message="$2" # This now contains actual literal newlines
-    local severity="$3" 
-    local bubble="$4"
-
+    local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # Passing the message without 'echo -e' because we are building it with literal breaks now
         /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
 }
-
-# # # # # # # # # # # # # # # # #
-#  UTILITIES                    #
-# # # # # # # # # # # # # # # # #
 
 contains_element() {
     local e match="$1"; shift
@@ -84,8 +75,7 @@ contains_element() {
 }
 
 create_sanoid_config() {
-    local target_path="$1"
-    local config_dir="$2"
+    local target_path="$1"; local config_dir="$2"
     mkdir -p "$config_dir"
     cp /etc/sanoid/sanoid.defaults.conf "$config_dir/sanoid.defaults.conf"
     cat <<EOF > "$config_dir/sanoid.conf"
@@ -93,111 +83,112 @@ create_sanoid_config() {
     use_template = production
     recursive = yes
 [template_production]
-    hourly = ${KEEP_HOURLY:-0}
-    daily = ${KEEP_DAILY:-0}
-    weekly = ${KEEP_WEEKLY:-0}
-    monthly = ${KEEP_MONTHLY:-0}
-    yearly = ${KEEP_YEARLY:-0}
-    autosnap = yes
-    autoprune = yes
+    hourly = ${KEEP_HOURLY:-0}; daily = ${KEEP_DAILY:-0}; weekly = ${KEEP_WEEKLY:-0}
+    monthly = ${KEEP_MONTHLY:-0}; yearly = ${KEEP_YEARLY:-0}
+    autosnap = yes; autoprune = yes
 EOF
 }
 
 replicate_with_repair() {
-    local mode="$1" 
-    local src="$2"
-    local dest_parent="$3"
-    local ds_name="$4"
+    local mode="$1"; local src="$2"; local dest_parent="$3"; local ds_name="$4"
     local dest_full_path="${dest_parent}/${ds_name}"
     local target="$dest_full_path"
     [[ "$mode" == "remote" ]] && target="${REMOTE_USER}@${REMOTE_HOST}:${dest_full_path}"
 
+    echo "🚀 Replicating ($mode) to $target..."
     /usr/local/sbin/syncoid -r --no-sync-snap --force-delete "$src" "$target"
     local status=$?
 
     if [ $status -ne 0 ]; then
+        echo "⚠️  Sync failed ($mode). Attempting repair..."
         if [[ "$mode" == "local" ]]; then
-            zfs receive -A "$dest_full_path" 2>/dev/null
-            zfs destroy -r "$dest_full_path"
+            zfs receive -A "$dest_full_path" 2>/dev/null; zfs destroy -r "$dest_full_path"
         else
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs receive -A $dest_full_path 2>/dev/null; zfs destroy -r $dest_full_path"
         fi
+        echo "🔄 Retrying full sync..."
         /usr/local/sbin/syncoid -r --no-sync-snap "$src" "$target"
         return $?
     fi
     return 0
 }
 
-# # # # # # # # # # # # # # # # #
-#  MAIN EXECUTION LOOP          #
-# # # # # # # # # # # # # # # # #
+
+# MAIN EXECUTION
+
 
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
     TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
     MANUAL_SNAP="manual_sync_$TIMESTAMP"
     
-    zfs snapshot -r "$SRC_DS@$MANUAL_SNAP"
+    echo "----------------------------------------------------"
+    echo "📦 Dataset: $SRC_DS"
 
-    local_stat=0 # 0=Fail, 1=Success, 2=Excluded
-    remote_stat=0
+    # 1. Take snapshot
+    zfs snapshot -r "$SRC_DS@$MANUAL_SNAP" && echo "📸 Manual snapshot created: $MANUAL_SNAP"
 
-    # Local
+    local_stat=0; remote_stat=0
+
+    # 2. Local Backup
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
+            echo "⏭️  Skipping Local (Excluded)"
             local_stat=2
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
             if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
+                echo "✅ Local sync successful."
                 local_stat=1
                 DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
                 rm -rf "$DST_RAM_LOCAL"
+                echo "🧹 Rotating manual snapshots on local backup..."
                 zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
             fi
         fi
     fi
 
-    # Remote
+    # 3. Remote Backup
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
+            echo "⏭️  Skipping Remote (Excluded)"
             remote_stat=2
         else
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
+                echo "✅ Remote sync successful."
                 remote_stat=1
             fi
         fi
     fi
 
-    # --- Nicer Summary Formatting ---
+    # 4. Icon Logic for Aggregated Notification
     L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || { [[ $local_stat -eq 2 ]] && L_ICON="⏭️" || L_ICON="❌"; }; }
     R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || { [[ $remote_stat -eq 2 ]] && R_ICON="⏭️" || R_ICON="❌"; }; }
     
-    # We build the string with a literal newline inside the quotes
+    # Building the literal newline string for Unraid UI
     SUMMARY_LOG+="📦 $DS | 💾 $L_ICON | ☁️ $R_ICON
 "
 
-    # Source Cleanup
+    # 5. Source Maintenance
     if [[ $local_stat -ge 1 || $remote_stat -ge 1 ]]; then
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots --quiet
         rm -rf "$SRC_RAM"
+        echo "🧹 Rotating manual snapshots on source..."
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
     else
+        echo "❌ Both Local and Remote failed for $DS."
         ((FAILURE_TOTAL++))
     fi
 done
 
-# # # # # # # # # # # # # # # # #
-#  FINAL AGGREGATION            #
-# # # # # # # # # # # # # # # # #
-
+# FINAL REPORT
 NOTIFY_TITLE="ZFS Backup Report"
-NOTIFY_SEVERITY="normal"
-NOTIFY_BUBBLE="🟢"
+NOTIFY_SEVERITY="normal"; NOTIFY_BUBBLE="🟢"
 
 if [ "$FAILURE_TOTAL" -gt 0 ]; then
     if [ "$SUCCESS_TOTAL" -gt 0 ]; then
@@ -207,8 +198,7 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
     fi
 fi
 
-# Print summary to console
-echo -e "📊 Final Summary:\n$SUMMARY_LOG"
-
-# Send notification (SUMMARY_LOG now contains actual line breaks)
+echo "----------------------------------------------------"
+echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+echo "🚀 ZFS Backup Finished."
