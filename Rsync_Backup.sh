@@ -103,11 +103,11 @@ backup_remote() {
 echo "🛠️ Remote Rsync Backup Started - $(date +%Y-%m-%d\ %H:%M:%S)"
 echo ""
 # 1. Connectivity Check
-if ! check_tailscale; then
-    echo "❌ Host $REMOTE_HOST is offline. Aborting."
-    unraid_notify "Backup Aborted" "Tailscale cannot reach $REMOTE_HOST" "alert" "🔴"
-    exit 1
-fi
+# if ! check_tailscale; then
+#     echo "❌ Host $REMOTE_HOST is offline. Aborting."
+#     unraid_notify "Backup Aborted" "Tailscale cannot reach $REMOTE_HOST" "alert" "🔴"
+#     exit 1
+# fi
 
 # 2. Iterate through the folder list
 for FOLDER in "${LOCAL_FOLDERS[@]}"; do
