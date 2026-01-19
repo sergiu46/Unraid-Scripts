@@ -65,6 +65,7 @@ if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d 
     exit 1
 fi
 echo "✅ Remote path verified."
+echo ""
 
 # 2. Backup Loop
 for FOLDER in "${LOCAL_FOLDERS[@]}"; do
@@ -80,13 +81,13 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     fi
 
     echo "📂 Folder: $FOLDER_NAME"
-    echo ""
     echo "🚀 Syncing to $REMOTE_HOST"
-    
+    echo ""
     # Mirror the local folder to the remote base directory
     rsync -av --delete --timeout=30 "$FOLDER" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
     
     if [ $? -eq 0 ]; then
+        echo ""
         echo "✅ Sync successful."
         SUMMARY_LOG+="📂 $FOLDER_NAME | ✅ Success
 "
