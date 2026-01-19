@@ -51,21 +51,20 @@
 #
 ##################################################################
 
-
 #!/bin/bash
 
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
-# Added initial newline for Telegram spacing
-SUMMARY_LOG="\n" 
+# Leading newline for Telegram spacing; printf will handle it for WebUI
+SUMMARY_LOG=$'\n'
 
 # FUNCTIONS
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # Explicitly passing formatted message
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$(echo -e "$message")" -i "$severity"
+        # Use printf to properly interpret newlines and avoid leading quote issues in Unraid UI
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$(printf "%b" "$message")" -i "$severity"
     fi
 }
 
@@ -173,7 +172,7 @@ for DS in "${DATASETS[@]}"; do
         fi
     fi
 
-    # 4. Icon & Text Logic
+    # 4. Result Text Mapping
     case $local_stat in
         1) L_RES="✅ Success" ;;
         2) L_RES="⏭️ Skipped" ;;
@@ -188,7 +187,7 @@ for DS in "${DATASETS[@]}"; do
         *) R_RES="➖ Disabled" ;;
     esac
     
-    # 5. Build Card Summary
+    # 5. Build Multi-line Card Summary
     SUMMARY_LOG+="📦 Dataset: $DS
 ↳ 💾 Local: $L_RES
 ↳ ☁️ Remote: $R_RES
@@ -225,6 +224,6 @@ fi
 echo "----------------------------------------------------"
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
-echo ""
-# Passing the log with echo -e to ensure newlines are processed
+
+# Final Notification Trigger
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
