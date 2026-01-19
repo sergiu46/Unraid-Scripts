@@ -54,15 +54,15 @@
 unraid_notify() {
     local message="$1"
     local severity="$2" 
-    local icon="🟢"
-    [[ "$severity" == "alert" ]] && icon="🔴"
-    [[ "$severity" == "warning" ]] && icon="🟡"
+    local bubble="🟢"
+    [[ "$severity" == "alert" ]] && bubble="🔴"
+    [[ "$severity" == "warning" ]] && bubble="🟡"
 
     # Notification Logic: Always send alerts/warnings. Send normal only if NOTIFY_LEVEL is "all".
     if [[ "$NOTIFY_LEVEL" == "all" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "ZFS Backup $icon" -d "$message" -i "$severity"
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble ZFS Backup" -d "$message" -i "$severity"
     elif [[ "$NOTIFY_LEVEL" == "error" && "$severity" != "normal" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "ZFS Backup $icon" -d "$message" -i "$severity"
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble ZFS Backup" -d "$message" -i "$severity"
     fi
 }
 
@@ -104,15 +104,19 @@ replicate_with_repair() {
     local status=$?
 
     if [ $status -ne 0 ]; then
-        echo "⚠️  Sync failed ($mode). Attempting repair..."
-        unraid_notify "⚠️ Out of sync detected on $mode ($ds_name). Repairing..." "warning"
+        echo "⚠️ Sync failed ($mode). Attempting repair..."
+        unraid_notify "⚠️ Out of sync or busy detected on $mode ($ds_name). Repairing..." "warning"
         
         if [[ "$mode" == "local" ]]; then
+            # Abort any stuck receive processes first (unlocks "busy" datasets)
+            zfs receive -A "$dest_full_path" 2>/dev/null
             zfs destroy -r "$dest_full_path"
         else
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs destroy -r $dest_full_path"
+            # Abort remote stuck receive, then destroy via SSH
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs receive -A $dest_full_path 2>/dev/null; zfs destroy -r $dest_full_path"
         fi
         
+        echo "🔄 Starting fresh full backup to $target..."
         /usr/local/sbin/syncoid -r --no-sync-snap "$src" "$target"
         return $?
     fi
@@ -155,7 +159,7 @@ for DS in "${DATASETS[@]}"; do
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
             remote_stat=0
-            # Remote pruning logic here if remote sanoid is configured
+            # Note: Remote rotation would require a remote ssh command
         fi
     fi
 
