@@ -52,7 +52,7 @@ unraid_notify() {
     
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
         # SHORT VERSION for WebUI (prevents cutoff/quotes)
-        local web_msg="Backup Complete. See logs for details."
+        local web_msg="Rsync Backup Complete. See logs for details."
         
         # FULL VERSION for Telegram/Email agents
         # Uses the -m flag for the long multi-line report
@@ -85,8 +85,8 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     
     if [ ! -d "$FOLDER" ]; then
         echo "⚠️  Skipping: $FOLDER (Local path not found)"
-        # Use \n for Telegram spacing
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ⏭️  Not Found\n"
+        # Style matching ZFS script
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ⏭️  Not Found\n"
         ((FAILURE_TOTAL++))
         continue
     fi
@@ -101,11 +101,11 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     if [ $? -eq 0 ]; then
         echo ""
         echo "✅ Sync successful."
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ✅ Success\n"
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ✅ Success\n"
         ((SUCCESS_TOTAL++))
     else
         echo "❌ Sync failed."
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME | ❌ Rsync Error\n"
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ❌ Rsync Error\n"
         ((FAILURE_TOTAL++))
     fi
 done
@@ -131,5 +131,5 @@ echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
 echo ""
 
 # Final Notification Trigger
-# We add the leading \n here to ensure Telegram has that empty row after the title
+# Starts with \n for the Telegram empty row, then passes the structured summary
 unraid_notify "$NOTIFY_TITLE" "\n$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
