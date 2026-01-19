@@ -120,7 +120,8 @@ replicate_with_repair() {
 
 
 # MAIN EXECUTION
-
+echo "🛠️ ZFS Backup Started at $(date +%H:%M:%S)"
+echo ""
 
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
@@ -204,7 +205,9 @@ if [ "$FAILURE_TOTAL" -gt 0 ]; then
 fi
 
 echo "----------------------------------------------------"
-echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
-unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
-echo "🚀 ZFS Backup Finished."
 echo ""
+echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
+echo ""
+echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
+echo ""
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
