@@ -132,4 +132,4 @@ echo ""
 
 # Final Notification Trigger
 # Starts with \n for the Telegram empty row, then passes the structured summary
-unraid_notify "$NOTIFY_TITLE" "\n$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
