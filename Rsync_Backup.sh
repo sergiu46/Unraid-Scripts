@@ -111,7 +111,7 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
 done
 
 # 3. Report Generation
-NOTIFY_TITLE="Rsync Backup"
+NOTIFY_TITLE="Rsync Backup Report"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
 
