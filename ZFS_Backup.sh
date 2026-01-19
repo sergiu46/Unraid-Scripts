@@ -30,6 +30,9 @@
 # REMOTE_USER="root"
 # REMOTE_HOST="192.168.1.50"
 #
+# # Notifications ("all" or "error")
+# NOTIFY_LEVEL="all"
+#
 # # System
 # DEBUG=true
 # SCRIPT_DIR="/dev/shm/scripts"
@@ -51,7 +54,16 @@
 unraid_notify() {
     local message="$1"
     local severity="$2" 
-    /usr/local/emhttp/webGui/scripts/notify -s "ZFS Backup" -d "$message" -i "$severity"
+    local icon="🟢"
+    [[ "$severity" == "alert" ]] && icon="🔴"
+    [[ "$severity" == "warning" ]] && icon="🟡"
+
+    # Notification Logic: Always send alerts/warnings. Send normal only if NOTIFY_LEVEL is "all".
+    if [[ "$NOTIFY_LEVEL" == "all" ]]; then
+        /usr/local/emhttp/webGui/scripts/notify -s "ZFS Backup $icon" -d "$message" -i "$severity"
+    elif [[ "$NOTIFY_LEVEL" == "error" && "$severity" != "normal" ]]; then
+        /usr/local/emhttp/webGui/scripts/notify -s "ZFS Backup $icon" -d "$message" -i "$severity"
+    fi
 }
 
 create_sanoid_config() {
@@ -143,7 +155,7 @@ for DS in "${DATASETS[@]}"; do
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
             remote_stat=0
-            # Note: Remote rotation would require a remote ssh command similar to the zfs destroy above.
+            # Remote pruning logic here if remote sanoid is configured
         fi
     fi
 
