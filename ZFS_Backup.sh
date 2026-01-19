@@ -10,6 +10,10 @@
 # SOURCE_POOL="cache"
 # DATASETS=("appdata")
 #
+# # Exclusion Lists eg:("system")
+# EXCLUDE_LOCAL=()
+# EXCLUDE_REMOTE=()
+#
 # # Manual Sync Snapshot Retention
 # KEEP_MANUAL="3"
 #
@@ -54,7 +58,6 @@ SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
-# FUNCTIONS
 unraid_notify() {
     local title_msg="$1"
     local message="$2"
@@ -64,6 +67,13 @@ unraid_notify() {
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
         /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
+}
+
+contains_element() {
+    local e match="$1"
+    shift
+    for e; do [[ "$e" == "$match" ]] && return 0; done
+    return 1
 }
 
 create_sanoid_config() {
@@ -103,20 +113,27 @@ replicate_with_repair() {
     local status=$?
 
     if [ $status -ne 0 ]; then
-        echo "⚠️ Sync failed ($mode). Attempting repair..."
+        echo "⚠️ Sync failed ($mode). Dataset may be out of sync or busy."
+        
         if [[ "$mode" == "local" ]]; then
+            echo "🚨 Clearing local locks and destroying $dest_full_path..."
             zfs receive -A "$dest_full_path" 2>/dev/null
             zfs destroy -r "$dest_full_path"
         else
+            echo "🚨 Clearing remote locks and destroying $dest_full_path..."
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs receive -A $dest_full_path 2>/dev/null; zfs destroy -r $dest_full_path"
         fi
+        
+        echo "🔄 Starting fresh full backup to $target..."
         /usr/local/sbin/syncoid -r --no-sync-snap "$src" "$target"
         return $?
     fi
     return 0
 }
 
-# MAIN EXECUTION LOGIC
+
+# MAIN EXECUTION LOOP
+
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
     TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
@@ -127,42 +144,50 @@ for DS in "${DATASETS[@]}"; do
 
     zfs snapshot -r "$SRC_DS@$MANUAL_SNAP"
 
-    local_stat=0
+    local_stat=0 # 0=Fail, 1=Success, 2=Excluded
     remote_stat=0
-    ds_failed=false
 
-    # --- Local Replication ---
+    # Local Backup
     if [[ "$RUN_LOCAL" == "yes" ]]; then
-        LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
-        if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
-            local_stat=1
-            DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
-            create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
-            /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
-            rm -rf "$DST_RAM_LOCAL"
-            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
+            echo "⏭️ Skipping Local (Excluded)"
+            local_stat=2
         else
-            ds_failed=true
+            LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
+            if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
+                local_stat=1
+                DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
+                create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
+                /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
+                rm -rf "$DST_RAM_LOCAL"
+                
+                echo "🧹 Rotating manual snapshots on local backup..."
+                zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+            fi
         fi
     fi
 
-    # --- Remote Replication ---
+    # Remote Backup
     if [[ "$RUN_REMOTE" == "yes" ]]; then
-        if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
-            remote_stat=1
+        if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
+            echo "⏭️ Skipping Remote (Excluded)"
+            remote_stat=2
         else
-            ds_failed=true
+            if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
+                remote_stat=1
+            fi
         fi
     fi
 
-    # --- Result Formatting for Notification ---
-    L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || L_ICON="❌"; }
-    R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || R_ICON="❌"; }
+    # Format Notification Icons
+    L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || { [[ $local_stat -eq 2 ]] && L_ICON="⏭️" || L_ICON="❌"; }; }
+    R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || { [[ $remote_stat -eq 2 ]] && R_ICON="⏭️" || R_ICON="❌"; }; }
     
     SUMMARY_LOG+="$DS: local $L_ICON remote $R_ICON\n"
 
-    # --- Cleanup Source if at least one target succeeded ---
-    if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
+    # Source Cleanup
+    if [[ $local_stat -ge 1 || $remote_stat -ge 1 ]]; then
+        echo "✅ Backup success ($DS). Pruning source snapshots..."
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
@@ -170,22 +195,22 @@ for DS in "${DATASETS[@]}"; do
         rm -rf "$SRC_RAM"
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
     else
+        echo "❌ Backup failed for $DS."
         ((FAILURE_TOTAL++))
     fi
 done
 
-# FINAL NOTIFICATION LOGIC
+#  FINAL AGGREGATION
+
 NOTIFY_TITLE="ZFS Backup"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
 
 if [ "$FAILURE_TOTAL" -gt 0 ]; then
     if [ "$SUCCESS_TOTAL" -gt 0 ]; then
-        NOTIFY_SEVERITY="warning"
-        NOTIFY_BUBBLE="🟡"
+        NOTIFY_SEVERITY="warning"; NOTIFY_BUBBLE="🟡"
     else
-        NOTIFY_SEVERITY="alert"
-        NOTIFY_BUBBLE="🔴"
+        NOTIFY_SEVERITY="alert"; NOTIFY_BUBBLE="🔴"
     fi
 fi
 
