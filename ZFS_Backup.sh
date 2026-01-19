@@ -51,19 +51,21 @@
 #
 ##################################################################
 
+
 #!/bin/bash
 
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
-SUMMARY_LOG=""
+# Added initial newline for Telegram spacing
+SUMMARY_LOG="\n" 
 
 # FUNCTIONS
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # EliteDesk removed as it is handled by the OS
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
+        # Explicitly passing formatted message
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$(echo -e "$message")" -i "$severity"
     fi
 }
 
@@ -134,7 +136,7 @@ for DS in "${DATASETS[@]}"; do
 
     local_stat=0; remote_stat=0
 
-    # 2. Local Backup
+    # 2. Local Backup Logic
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
             echo "⏭️  Skipping Local (Excluded)"
@@ -156,7 +158,7 @@ for DS in "${DATASETS[@]}"; do
         fi
     fi
 
-    # 3. Remote Backup
+    # 3. Remote Backup Logic
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
             echo "⏭️  Skipping Remote (Excluded)"
@@ -171,7 +173,7 @@ for DS in "${DATASETS[@]}"; do
         fi
     fi
 
-    # 4. Icon & Text Logic for Notification
+    # 4. Icon & Text Logic
     case $local_stat in
         1) L_RES="✅ Success" ;;
         2) L_RES="⏭️ Skipped" ;;
@@ -186,7 +188,7 @@ for DS in "${DATASETS[@]}"; do
         *) R_RES="➖ Disabled" ;;
     esac
     
-    # 5. Build Multi-line Summary (Card Style)
+    # 5. Build Card Summary
     SUMMARY_LOG+="📦 Dataset: $DS
 ↳ 💾 Local: $L_RES
 ↳ ☁️ Remote: $R_RES
@@ -224,4 +226,5 @@ echo "----------------------------------------------------"
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
 echo ""
+# Passing the log with echo -e to ensure newlines are processed
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
