@@ -15,7 +15,7 @@
 # )
 #
 # # CONFIGURATION
-# REMOTE_IP="unraid-fctpn.tail6592cc.ts.net"      # Your Tailscale IP
+# REMOTE_HOST="unraid-fctpn.tail6592cc.ts.net"      # Your Tailscale IP
 # REMOTE_USER="root"
 # REMOTE_BASE_DIR="/mnt/user/Sergiu"
 #
@@ -55,8 +55,8 @@ unraid_notify() {
 }
 
 check_tailscale() {
-    echo "🌐 Checking Tailscale connection to $REMOTE_IP..."
-    if tailscale status | grep -q "$REMOTE_IP"; then
+    echo "🌐 Checking Tailscale connection to $REMOTE_HOST..."
+    if tailscale status | grep -q "$REMOTE_HOST"; then
         echo "✅ Tailscale is online."
         return 0
     else
@@ -70,13 +70,13 @@ backup_remote() {
     
     echo "----------------------------------------------------"
     echo "📦 Folder: $FOLDER_NAME"
-    echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_IP..."
+    echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_HOST..."
 
     # Check if the remote base directory exists via SSH
-    if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_IP" "[ -d '$REMOTE_BASE_DIR' ]"; then
+    if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
         
         # Perform rsync
-        rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_IP":"$REMOTE_BASE_DIR/"
+        rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
         
         if [ $? -eq 0 ]; then
             echo "✅ Sync successful."
@@ -104,7 +104,7 @@ echo ""
 # 1. Connectivity Check
 if ! check_tailscale; then
     echo "❌ Tailscale is offline. Aborting."
-    unraid_notify "Backup Aborted" "Tailscale is not connected to $REMOTE_IP" "alert" "🔴"
+    unraid_notify "Backup Aborted" "Tailscale is not connected to $REMOTE_HOST" "alert" "🔴"
     exit 1
 fi
 
