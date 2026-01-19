@@ -15,7 +15,7 @@
 # )
 #
 # # CONFIGURATION
-# REMOTE_HOST="unraid.tail.ts.net"      # Your Tailscale IP
+# REMOTE_HOST="192.168.1.2"
 # REMOTE_USER="root"
 # REMOTE_BASE_DIR="/mnt/user/Sergiu"
 #
@@ -23,7 +23,7 @@
 # NOTIFY_LEVEL="all"
 #
 # # System
-# DEBUG=true
+# # DEBUG=true
 # SCRIPT_DIR="/dev/shm/scripts"
 # SCRIPT="$SCRIPT_DIR/Rsync_Backup.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Rsync_Backup.sh"
@@ -35,6 +35,7 @@
 #    { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT"
 ##################################################################
+
 #!/bin/bash
 
 # --- INITIALIZATION ---
@@ -43,7 +44,6 @@ FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
 # --- FUNCTIONS ---
-
 unraid_notify() {
     local title_msg="$1"
     local message="$2"
@@ -56,14 +56,15 @@ unraid_notify() {
 }
 
 check_tailscale() {
-    # We use REMOTE_HOST now. We cut to the first part (hostname) to grep status safely.
-    local HOST_SHORT=$(echo "$REMOTE_HOST" | cut -d. -f1)
-    echo "🌐 Checking Tailscale connection to $HOST_SHORT..."
+    echo "🌐 Checking Tailscale reachability for $REMOTE_HOST..."
     
-    if tailscale status | grep -q "$HOST_SHORT"; then
-        echo "✅ Tailscale is online."
+    # tailscale ping is more reliable than grep status
+    # It handles IP, MagicDNS, and Short Names automatically
+    if tailscale ping -c 1 --timeout 3s "$REMOTE_HOST" > /dev/null 2>&1; then
+        echo "✅ Tailscale connection confirmed."
         return 0
     else
+        echo "❌ Tailscale ping failed. Host is unreachable."
         return 1
     fi
 }
@@ -74,11 +75,10 @@ backup_remote() {
     
     echo "----------------------------------------------------"
     echo "📦 Folder: $FOLDER_NAME"
+    echo ""
     echo "🚀 Starting rsync to $REMOTE_USER@$REMOTE_HOST..."
 
-    # Check if the remote base directory exists via SSH
-    # Note: We use REMOTE_HOST here, not REMOTE_IP
-    if ssh -o ConnectTimeout=5 "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
+    if ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
         
         # Perform rsync
         rsync -av --delete --timeout=30 "$SRC" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
@@ -95,22 +95,20 @@ backup_remote() {
             ((FAILURE_TOTAL++))
         fi
     else
-        echo "❌ Sync failed: Remote directory not found."
-        SUMMARY_LOG+="📦 $FOLDER_NAME | 📂 Remote Path Missing
+        echo "❌ Connection failed (Check SSH Keys) or Remote directory missing."
+        SUMMARY_LOG+="📦 $FOLDER_NAME | 📂 Connection/Path Error
 "
         ((FAILURE_TOTAL++))
     fi
 }
 
-# --- MAIN EXECUTION ---
-
-# Single line title
+# MAIN EXECUTION
 echo "🛠️ Remote Rsync Backup Started - $(date +%Y-%m-%d\ %H:%M:%S)"
-
+echo ""
 # 1. Connectivity Check
 if ! check_tailscale; then
-    echo "❌ Tailscale is offline. Aborting."
-    unraid_notify "Backup Aborted" "Tailscale is not connected to $REMOTE_HOST" "alert" "🔴"
+    echo "❌ Host $REMOTE_HOST is offline. Aborting."
+    unraid_notify "Backup Aborted" "Tailscale cannot reach $REMOTE_HOST" "alert" "🔴"
     exit 1
 fi
 
@@ -120,7 +118,7 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
         backup_remote "$FOLDER"
     else
         echo "----------------------------------------------------"
-        echo "⚠️  Skipping: $FOLDER (Not found)"
+        echo "⚠️  Skipping: $FOLDER (Local path not found)"
         SUMMARY_LOG+="📦 $(basename "$FOLDER") | ⏭️  Not Found
 "
         ((FAILURE_TOTAL++))
