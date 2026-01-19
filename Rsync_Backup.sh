@@ -52,7 +52,7 @@ unraid_notify() {
     
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
         # SHORT VERSION for WebUI (prevents cutoff/quotes)
-        local web_msg="Rsync Backup Complete. See logs for details."
+        local web_msg="Backup Complete. See logs for details."
         
         # FULL VERSION for Telegram/Email agents
         # Uses the -m flag for the long multi-line report
@@ -111,7 +111,7 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
 done
 
 # 3. Report Generation
-NOTIFY_TITLE="Rsync Backup Report"
+NOTIFY_TITLE="Rsync Backup"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
 
