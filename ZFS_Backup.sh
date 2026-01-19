@@ -11,10 +11,9 @@
 # DATASETS=("appdata")
 #
 # # Manual Sync Snapshot Retention
-# # How many "manual_sync_" snapshots to keep on the source
 # KEEP_MANUAL="3"
 #
-# # Sanoid Retention Policy (Defaults to 0 if left blank)
+# # Sanoid Retention Policy
 # KEEP_HOURLY="24"
 # KEEP_DAILY="7"
 # KEEP_WEEKLY="4"
@@ -50,19 +49,20 @@
 
 #!/bin/bash
 
+# TRACKING VARIABLES
+SUCCESS_TOTAL=0
+FAILURE_TOTAL=0
+SUMMARY_LOG=""
+
 # FUNCTIONS
 unraid_notify() {
-    local message="$1"
-    local severity="$2" 
-    local bubble="🟢"
-    [[ "$severity" == "alert" ]] && bubble="🔴"
-    [[ "$severity" == "warning" ]] && bubble="🟡"
+    local title_msg="$1"
+    local message="$2"
+    local severity="$3" 
+    local bubble="$4"
 
-    # Notification Logic: Always send alerts/warnings. Send normal only if NOTIFY_LEVEL is "all".
-    if [[ "$NOTIFY_LEVEL" == "all" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble ZFS Backup" -d "$message" -i "$severity"
-    elif [[ "$NOTIFY_LEVEL" == "error" && "$severity" != "normal" ]]; then
-        /usr/local/emhttp/webGui/scripts/notify -s "$bubble ZFS Backup" -d "$message" -i "$severity"
+    if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
+        /usr/local/emhttp/webGui/scripts/notify -s "$bubble $title_msg" -d "$message" -i "$severity"
     fi
 }
 
@@ -72,7 +72,6 @@ create_sanoid_config() {
     mkdir -p "$config_dir"
     cp /etc/sanoid/sanoid.defaults.conf "$config_dir/sanoid.defaults.conf"
 
-    # Use :-0 to default to 0 if the variable is empty or undefined
     cat <<EOF > "$config_dir/sanoid.conf"
 [$target_path]
     use_template = production
@@ -105,26 +104,19 @@ replicate_with_repair() {
 
     if [ $status -ne 0 ]; then
         echo "⚠️ Sync failed ($mode). Attempting repair..."
-        unraid_notify "⚠️ Out of sync or busy detected on $mode ($ds_name). Repairing..." "warning"
-        
         if [[ "$mode" == "local" ]]; then
-            # Abort any stuck receive processes first (unlocks "busy" datasets)
             zfs receive -A "$dest_full_path" 2>/dev/null
             zfs destroy -r "$dest_full_path"
         else
-            # Abort remote stuck receive, then destroy via SSH
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs receive -A $dest_full_path 2>/dev/null; zfs destroy -r $dest_full_path"
         fi
-        
-        echo "🔄 Starting fresh full backup to $target..."
         /usr/local/sbin/syncoid -r --no-sync-snap "$src" "$target"
         return $?
     fi
     return 0
 }
 
-#  MAIN EXECUTION LOGIC
-
+# MAIN EXECUTION LOGIC
 for DS in "${DATASETS[@]}"; do
     SRC_DS="${SOURCE_POOL}/${DS}"
     TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
@@ -133,56 +125,72 @@ for DS in "${DATASETS[@]}"; do
     echo "----------------------------------------------------"
     echo "📦 Dataset: $SRC_DS"
 
-    # 1. Create the new Manual Snapshot
     zfs snapshot -r "$SRC_DS@$MANUAL_SNAP"
 
-    local_stat=1
-    remote_stat=1
+    local_stat=0
+    remote_stat=0
+    ds_failed=false
 
-    # 2. Local Backup + Prune
+    # --- Local Replication ---
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
         if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
-            local_stat=0
+            local_stat=1
             DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
             create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
             /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
             rm -rf "$DST_RAM_LOCAL"
-
-            # 🧹 Rotation for Manual Snapshots on the BACKUP pool
-            echo "🧹 Rotating manual snapshots on local backup (keeping $KEEP_MANUAL)..."
-            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}
+            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        else
+            ds_failed=true
         fi
     fi
 
-    # 3. Remote Backup
+    # --- Remote Replication ---
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
-            remote_stat=0
-            # Note: Remote rotation would require a remote ssh command
+            remote_stat=1
+        else
+            ds_failed=true
         fi
     fi
 
-    # 4. Source Pruning & Manual Snapshot Cleanup
-    if [[ $local_stat -eq 0 || $remote_stat -eq 0 ]]; then
-        echo "✅ Backup success. Managing snapshots..."
-        
-        # A. Sanoid Pruning
+    # --- Result Formatting for Notification ---
+    L_ICON="➖"; [[ "$RUN_LOCAL" == "yes" ]] && { [[ $local_stat -eq 1 ]] && L_ICON="✅" || L_ICON="❌"; }
+    R_ICON="➖"; [[ "$RUN_REMOTE" == "yes" ]] && { [[ $remote_stat -eq 1 ]] && R_ICON="✅" || R_ICON="❌"; }
+    
+    SUMMARY_LOG+="$DS: local $L_ICON remote $R_ICON\n"
+
+    # --- Cleanup Source if at least one target succeeded ---
+    if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
+        ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots --quiet
         rm -rf "$SRC_RAM"
-
-        # B. Manual Snapshot Rotation on SOURCE
-        echo "🧹 Rotating manual snapshots on source (keeping $KEEP_MANUAL)..."
-        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}
-        
-        unraid_notify "✅ Success: $DS backed up." "normal"
+        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
     else
-        unraid_notify "❌ Error: Backup failed for $DS." "alert"
+        ((FAILURE_TOTAL++))
     fi
 done
 
+# FINAL NOTIFICATION LOGIC
+NOTIFY_TITLE="ZFS Backup"
+NOTIFY_SEVERITY="normal"
+NOTIFY_BUBBLE="🟢"
+
+if [ "$FAILURE_TOTAL" -gt 0 ]; then
+    if [ "$SUCCESS_TOTAL" -gt 0 ]; then
+        NOTIFY_SEVERITY="warning"
+        NOTIFY_BUBBLE="🟡"
+    else
+        NOTIFY_SEVERITY="alert"
+        NOTIFY_BUBBLE="🔴"
+    fi
+fi
+
+echo -e "📊 Final Summary:\n$SUMMARY_LOG"
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+
 echo "----------------------------------------------------"
 echo "🚀 ZFS Backup Finished."
-echo ""
