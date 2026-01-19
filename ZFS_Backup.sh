@@ -1,26 +1,48 @@
 ##################################################################
+# ZFS backup using snapshots and replication to a local and remote pool.
+# 
+# HOW TO USE:
+# Create a new "User Script" in Unraid and paste the code below.
+#
+# --- COPY THIS TO UNRAID USER SCRIPTS ---
+# #!/bin/bash
+#
 # SOURCE_POOL="cache"
 # DATASETS=("appdata")
-
+#
 # # Manual Sync Snapshot Retention
 # # How many "manual_sync_" snapshots to keep on the source
 # KEEP_MANUAL="3"
-
+#
 # # Sanoid Retention Policy (Defaults to 0 if left blank)
 # KEEP_HOURLY="24"
 # KEEP_DAILY="7"
 # KEEP_WEEKLY="4"
 # KEEP_MONTHLY="3"
 # KEEP_YEARLY="0"
-
+#
 # # Destinations
 # RUN_LOCAL="yes"
 # DEST_PARENT_LOCAL="local_pool/local_backup"
-
+#
 # RUN_REMOTE="yes" 
 # DEST_PARENT_REMOTE="remote_pool/offsite_backups"
 # REMOTE_USER="root"
 # REMOTE_HOST="192.168.1.50"
+#
+# # System
+# DEBUG=true
+# SCRIPT_DIR="/dev/shm/scripts"
+# SCRIPT="$DIR/ZFS_Backup.sh"
+# URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
+#
+# [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
+# mkdir -p "$SCRIPT_DIR"
+# [[ -f "$SCRIPT" ]] || \
+#   curl -s -fL "$URL" -o "$SCRIPT" || \
+#   { echo "❌ Download Failed"; exit 1; }
+# source "$SCRIPT"
+#
 ##################################################################
 
 #!/bin/bash
