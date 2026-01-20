@@ -3,37 +3,40 @@
 # 
 # HOW TO USE:
 # Create a new "User Script" in Unraid and paste the code below.
+# Fill variables with desired values.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
+
 # #!/bin/bash
 #
 # # List only the local folders you want to back up
 # LOCAL_FOLDERS=(
-#      "/mnt/user/Pictures"
-#      "/mnt/user/Movies"
-#      "/mnt/user/Personal"
+#     "/mnt/user/Pictures"
+#     "/mnt/user/Videos"
 # )
 #
 # # CONFIGURATION
-# REMOTE_HOST="192.168.1.2"
+# REMOTE_HOST="192.168.1.50"
 # REMOTE_USER="root"
-# REMOTE_BASE_DIR="/mnt/user/Sergiu"
-#
-# # Set to "all" for a report every time, or "error" to only notify on failure
-# NOTIFY_LEVEL="all"
+# REMOTE_BASE_DIR="/mnt/user/Backup"
 #
 # # System
-# # DEBUG=true
+# # Debug "true" or "false" 
+# # Notifications "all" or "error"
+# DEBUG=false
+# NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
 # SCRIPT="$SCRIPT_DIR/Rsync_Backup.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Rsync_Backup.sh"
 #
+# # Download script
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
 # [[ -f "$SCRIPT" ]] || \
-#    curl -s -fL "$URL" -o "$SCRIPT" || \
-#    { echo "❌ Download Failed"; exit 1; }
+#     curl -s -fL "$URL" -o "$SCRIPT" || \
+#     { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT"
+
 ##################################################################
 
 #!/bin/bash
