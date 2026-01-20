@@ -147,8 +147,8 @@ for DS in "${DATASETS[@]}"; do
     # 2. Local Backup Logic
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
-            echo ""
             echo "⏭️  Skipping Local (Excluded)"
+            echo ""
             local_stat=2
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
@@ -169,8 +169,8 @@ for DS in "${DATASETS[@]}"; do
     # 3. Remote Backup Logic
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
-            echo ""
             echo "⏭️  Skipping Remote (Excluded)"
+            echo ""
             remote_stat=2
         else
             REMOTE_DS="${DEST_PARENT_REMOTE}/${DS}"
