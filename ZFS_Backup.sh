@@ -153,8 +153,8 @@ for DS in "${DATASETS[@]}"; do
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
             if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
-                echo ""
                 echo "✅ Local sync successful."
+                echo ""
                 local_stat=1
                 DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
