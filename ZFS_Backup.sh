@@ -177,6 +177,7 @@ for DS in "${DATASETS[@]}"; do
             remote_stat=2
         else
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
+                echo ""
                 echo "✅ Remote sync successful."
                 remote_stat=1
             else
