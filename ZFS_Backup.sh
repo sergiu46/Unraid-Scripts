@@ -177,6 +177,19 @@ for DS in "${DATASETS[@]}"; do
                 echo "✅ Remote sync successful."
                 echo ""
                 remote_stat=1
+                
+                # --- ADD THIS START ---
+                echo "🧹 Pruning snapshots on remote host..."
+                DST_RAM_REMOTE="/dev/shm/Sanoid/dst_remote_${DS//\//_}"
+                create_sanoid_config "$REMOTE_DS" "$DST_RAM_REMOTE"
+                
+                # Copy config to remote and run sanoid there
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p /tmp/sanoid_config"
+                scp "$DST_RAM_REMOTE/"* "${REMOTE_USER}@${REMOTE_HOST}:/tmp/sanoid_config/"
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "sanoid --configdir /tmp/sanoid_config --prune-snapshots"
+                
+                rm -rf "$DST_RAM_REMOTE"
+                # --- ADD THIS END ---
             else
                 remote_stat=3
             fi
