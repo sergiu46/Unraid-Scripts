@@ -67,8 +67,6 @@ unraid_notify() {
         # SHORT VERSION for WebUI (prevents cutoff/quotes)
         local web_msg="Backup Complete. See logs for details."
         
-        # FULL VERSION for Telegram/Email agents
-        # The Unraid PHP agent handles the -m flag for long messages.
         /usr/local/emhttp/webGui/scripts/notify \
             -i "$severity" \
             -s "$bubble $title_msg" \
@@ -128,6 +126,8 @@ replicate_with_repair() {
 }
 
 # MAIN EXECUTION
+echo "----------------------------------------------------"
+echo ""
 echo "🛠️ ZFS Backup Started at $(date +%H:%M:%S)"
 echo ""
 
@@ -156,7 +156,7 @@ for DS in "${DATASETS[@]}"; do
                 local_stat=1
                 DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
-                /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots --quiet
+                /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
                 echo "🧹 Rotating manual snapshots on local backup..."
                 zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
@@ -205,7 +205,7 @@ for DS in "${DATASETS[@]}"; do
         ((SUCCESS_TOTAL++))
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
-        /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots --quiet
+        /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
         echo "🧹 Rotating manual snapshots on source..."
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
@@ -229,9 +229,11 @@ fi
 echo "----------------------------------------------------"
 echo ""
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
+echo "----------------------------------------------------"
 echo ""
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
 echo ""
+echo "----------------------------------------------------"
 # Final Notification Trigger
 # Passes the SUMMARY_LOG to the detailed message field
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
