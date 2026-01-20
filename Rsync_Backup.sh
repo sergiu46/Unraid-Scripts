@@ -65,9 +65,11 @@ unraid_notify() {
 }
 
 # --- MAIN EXECUTION ---
+echo "----------------------------------------------------"
+echo ""
 echo "🛠️ Rsync Backup Started at $(date +%H:%M:%S)"
 echo ""
-
+echo "----------------------------------------------------"
 # 1. Verification Handshake
 echo "🌐 Connecting to $REMOTE_HOST and verifying destination..."
 if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
@@ -76,7 +78,7 @@ if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d 
     exit 1
 fi
 echo "✅ Remote path verified."
-echo ""
+
 
 # 2. Backup Loop
 for FOLDER in "${LOCAL_FOLDERS[@]}"; do
@@ -127,9 +129,11 @@ echo "----------------------------------------------------"
 echo ""
 echo "📊 FINAL SUMMARY:"
 echo -e "$SUMMARY_LOG"
+echo "----------------------------------------------------"
+echo ""
 echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
 echo ""
+echo "----------------------------------------------------"
 
 # Final Notification Trigger
-# Starts with \n for the Telegram empty row, then passes the structured summary
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
