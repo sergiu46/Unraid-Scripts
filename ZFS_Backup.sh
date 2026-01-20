@@ -186,10 +186,9 @@ for DS in "${DATASETS[@]}"; do
                 # Copy config to remote and run sanoid there
                 ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p /tmp/sanoid_config"
                 scp "$DST_RAM_REMOTE/"* "${REMOTE_USER}@${REMOTE_HOST}:/tmp/sanoid_config/"
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "sanoid --configdir /tmp/sanoid_config --prune-snapshots"
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir /tmp/sanoid_config --prune-snapshots"
                 
                 rm -rf "$DST_RAM_REMOTE"
-                # --- ADD THIS END ---
             else
                 remote_stat=3
             fi
