@@ -141,17 +141,19 @@ for DS in "${DATASETS[@]}"; do
 
     # 1. Take snapshot
     zfs snapshot -r "$SRC_DS@$MANUAL_SNAP" && echo "📸 Manual snapshot created: $MANUAL_SNAP"
-
+    echo ""
     local_stat=0; remote_stat=0
 
     # 2. Local Backup Logic
     if [[ "$RUN_LOCAL" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
+            echo ""
             echo "⏭️  Skipping Local (Excluded)"
             local_stat=2
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
             if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
+                echo ""
                 echo "✅ Local sync successful."
                 local_stat=1
                 DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
@@ -159,6 +161,7 @@ for DS in "${DATASETS[@]}"; do
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
                 echo "🧹 Rotating manual snapshots on local backup..."
+                echo ""
                 zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
             else
                 local_stat=3
@@ -169,6 +172,7 @@ for DS in "${DATASETS[@]}"; do
     # 3. Remote Backup Logic
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
+            echo ""
             echo "⏭️  Skipping Remote (Excluded)"
             remote_stat=2
         else
