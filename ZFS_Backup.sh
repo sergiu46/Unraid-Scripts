@@ -201,8 +201,9 @@ for DS in "${DATASETS[@]}"; do
     # 5. Build Multi-line Card Summary
     SUMMARY_LOG+="\n📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
 
-    # 6. Maintenance & Rotation (Source, Local, and Remote)
-    if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
+    # 6. Source Maintenance & Rotation
+    # Logic: Rotate if (Both are disabled) OR (At least one backup succeeded)
+    if [[ ("$RUN_LOCAL" != "yes" && "$RUN_REMOTE" != "yes") || ($local_stat -eq 1 || $remote_stat -eq 1) ]]; then
         ((SUCCESS_TOTAL++))
         
         # Sanoid Maintenance for Source
@@ -213,22 +214,22 @@ for DS in "${DATASETS[@]}"; do
         
         echo "🧹 Rotating manual snapshots..."
 
-        # Rotate Source
+        # Always rotate Source
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         
-        # Rotate Local (if successful)
+        # Rotate Local destination (only if successful)
         if [[ $local_stat -eq 1 ]]; then
             zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         fi
 
-        # Rotate Remote (if successful)
+        # Rotate Remote destination (only if successful)
         if [[ $remote_stat -eq 1 ]]; then
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@manual_sync_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
         
         echo "✅ Rotation complete."
     else
-        echo "❌ Both Local and Remote failed for $DS."
+        echo "❌ Backup enabled but failed. Skipping rotation to preserve history."
         ((FAILURE_TOTAL++))
     fi
 done
