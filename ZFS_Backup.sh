@@ -1,54 +1,53 @@
 ##################################################################
 # ZFS backup using snapshots and replication to a local and remote pool.
-# 
+#
 # HOW TO USE:
 # Create a new "User Script" in Unraid and paste the code below.
+# Fill all variables with desired values.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
+
 # #!/bin/bash
 #
 # SOURCE_POOL="cache"
-# DATASETS=("appdata")
-#
-# # Exclusion Lists eg:("system")
-# EXCLUDE_LOCAL=()
-# EXCLUDE_REMOTE=()
-#
-# # Manual Sync Snapshot Retention
-# KEEP_MANUAL="3"
-#
-# # Sanoid Retention Policy
-# KEEP_HOURLY="24"
-# KEEP_DAILY="7"
-# KEEP_WEEKLY="4"
-# KEEP_MONTHLY="3"
-# KEEP_YEARLY="0"
+# DATASETS=( "appdata" "system" )
 #
 # # Destinations
 # RUN_LOCAL="yes"
+# EXCLUDE_LOCAL=()
 # DEST_PARENT_LOCAL="local_pool/local_backup"
 #
-# RUN_REMOTE="yes" 
+# RUN_REMOTE="yes"
+# EXCLUDE_REMOTE=("system")
 # DEST_PARENT_REMOTE="remote_pool/offsite_backups"
 # REMOTE_USER="root"
 # REMOTE_HOST="192.168.1.50"
 #
-# # Notifications ("all" or "error")
-# NOTIFY_LEVEL="all"
+# # Sanoid Retention Policy
+# KEEP_MANUAL="2"
+# KEEP_HOURLY="0"
+# KEEP_DAILY="3"
+# KEEP_WEEKLY="0"
+# KEEP_MONTHLY="0"
+# KEEP_YEARLY="0"
 #
 # # System
-# DEBUG=true
+# # Debug "true" or "false" 
+# # Notifications "all" or "error"
+# DEBUG=false
+# NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
 # SCRIPT="$SCRIPT_DIR/ZFS_Backup.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
 #
+# # Download script
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
 # [[ -f "$SCRIPT" ]] || \
-#    curl -s -fL "$URL" -o "$SCRIPT" || \
-#    { echo "❌ Download Failed"; exit 1; }
+#   curl -s -fL "$URL" -o "$SCRIPT" || \
+#   { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT"
-#
+
 ##################################################################
 
 #!/bin/bash
