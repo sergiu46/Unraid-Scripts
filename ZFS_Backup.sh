@@ -160,9 +160,6 @@ for DS in "${DATASETS[@]}"; do
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
-                echo "🧹 Rotating manual snapshots on local backup..."
-                echo ""
-                zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
             else
                 local_stat=3
             fi
@@ -176,6 +173,7 @@ for DS in "${DATASETS[@]}"; do
             echo "⏭️  Skipping Remote (Excluded)"
             remote_stat=2
         else
+            REMOTE_DS="${DEST_PARENT_REMOTE}/${DS}"
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
                 echo ""
                 echo "✅ Remote sync successful."
@@ -202,18 +200,34 @@ for DS in "${DATASETS[@]}"; do
     esac
     
     # 5. Build Multi-line Card Summary
-    # Using \n for Telegram/Detailed view
     SUMMARY_LOG+="\n📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
 
-    # 6. Source Maintenance
+    # 6. Maintenance & Rotation (Source, Local, and Remote)
     if [[ $local_stat -eq 1 || $remote_stat -eq 1 ]]; then
         ((SUCCESS_TOTAL++))
+        
+        # Sanoid Maintenance for Source
         SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
-        echo "🧹 Rotating manual snapshots on source..."
+        
+        echo "🧹 Rotating manual snapshots..."
+
+        # Rotate Source
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        
+        # Rotate Local (if successful)
+        if [[ $local_stat -eq 1 ]]; then
+            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        fi
+
+        # Rotate Remote (if successful)
+        if [[ $remote_stat -eq 1 ]]; then
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@manual_sync_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
+        fi
+        
+        echo "✅ Rotation complete."
     else
         echo "❌ Both Local and Remote failed for $DS."
         ((FAILURE_TOTAL++))
@@ -239,6 +253,4 @@ echo ""
 echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
 echo ""
 echo "----------------------------------------------------"
-# Final Notification Trigger
-# Passes the SUMMARY_LOG to the detailed message field
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
