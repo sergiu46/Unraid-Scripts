@@ -52,6 +52,9 @@
 
 #!/bin/bash
 
+LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock"
+exec 200>"$LOCKFILE" flock -n 200 || { echo "❌ Script already running"; exit 1; }
+
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
