@@ -41,6 +41,9 @@
 
 #!/bin/bash
 
+LOCKFILE="$SCRIPT_DIR/Rsync_Backup.lock"
+exec 200>"$LOCKFILE" flock -n 200 || { echo "❌ Script already running"; exit 1; }
+
 # --- INITIALIZATION ---
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
