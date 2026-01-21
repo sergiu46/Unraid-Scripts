@@ -46,14 +46,14 @@
 # [[ -f "$SCRIPT" ]] || \
 #   curl -s -fL "$URL" -o "$SCRIPT" || \
 #   { echo "❌ Download Failed"; exit 1; }
+# LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock" 
+# exec 200>"$LOCKFILE" 
+# flock -n 200 || { echo "❌ Script already running"; exit 1; }
 # source "$SCRIPT"
 
 ##################################################################
 
 #!/bin/bash
-
-LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock"
-exec 200>"$LOCKFILE" flock -n 200 || { echo "❌ Script already running"; exit 1; }
 
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
