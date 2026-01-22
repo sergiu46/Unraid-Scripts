@@ -154,7 +154,7 @@ for DS in "${DATASETS[@]}"; do
         else
             LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
             if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
-                echo "✅ Local sync successful."
+                echo "✅ Local sync successful!"
                 echo ""
                 local_stat=1
                 DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
@@ -170,13 +170,13 @@ for DS in "${DATASETS[@]}"; do
     # 3. Remote Backup Logic
     if [[ "$RUN_REMOTE" == "yes" ]]; then
         if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
-            echo "⏭️  Skipping Remote (Excluded)"
+            echo "⏭️  Skipping Remote (Excluded)."
             echo ""
             remote_stat=2
         else
             REMOTE_DS="${DEST_PARENT_REMOTE}/${DS}"
             if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
-                echo "✅ Remote sync successful."
+                echo "✅ Remote sync successful!"
                 echo ""
                 remote_stat=1
                 
@@ -226,7 +226,7 @@ for DS in "${DATASETS[@]}"; do
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
         
-        echo "🧹 Purging manual snapshots locally ..."
+        echo "🧹 Pruning manual snapshots locally..."
 
         # Always rotate Source
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
@@ -241,7 +241,7 @@ for DS in "${DATASETS[@]}"; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@manual_sync_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
         
-        echo "✅ Purging complete."
+        echo "✅ Pruning complete!"
     else
         echo "❌ Backup enabled but failed. Skipping rotation to preserve history."
         ((FAILURE_TOTAL++))
