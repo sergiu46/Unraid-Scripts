@@ -34,21 +34,21 @@
 # # System
 # # Debug "true" or "false" 
 # # Notifications "all" or "error"
-# DEBUG=false
+# DEBUG=true
 # NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
 # SCRIPT="$SCRIPT_DIR/ZFS_Backup.sh"
+# LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
-#
+
 # # Download script
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT" ]] || \
-#   curl -s -fL "$URL" -o "$SCRIPT" || \
-#   { echo "❌ Download Failed"; exit 1; }
-# LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock" 
+# [[ -f "$SCRIPT" ]] || curl -s -fL "$URL" -o "$SCRIPT" || \
+# { echo "❌ Download Failed"; exit 1; }
 # exec 200>"$LOCKFILE" 
-# flock -n 200 || { echo "❌ Script already running"; exit 1; }
+# flock -n 200 || \
+# { echo "❌ Script already running"; exit 1; }
 # source "$SCRIPT"
 
 ##################################################################
@@ -227,7 +227,7 @@ for DS in "${DATASETS[@]}"; do
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
         
-        echo "🧹 Rotating manual snapshots..."
+        echo "🧹 Purging manual snapshots locally ..."
 
         # Always rotate Source
         zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
@@ -242,7 +242,7 @@ for DS in "${DATASETS[@]}"; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@manual_sync_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
         
-        echo "✅ Rotation complete."
+        echo "✅ Purging complete."
     else
         echo "❌ Backup enabled but failed. Skipping rotation to preserve history."
         ((FAILURE_TOTAL++))
