@@ -7,6 +7,7 @@
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 
+
 # #!/bin/bash
 #
 # SOURCE_POOL="cache"
@@ -47,6 +48,7 @@
 # flock -n 200 || \
 # { echo "❌ Script already running"; exit 1; }
 # source "$SCRIPT_DIR/ZFS_Backup.sh"
+
 
 ##################################################################
 
@@ -127,7 +129,7 @@ replicate_with_repair() {
 # MAIN EXECUTION
 echo "----------------------------------------------------"
 echo ""
-echo "🛠️ ZFS Backup Started at $(date +'%H:%M:%S %d.%m.%Y')"
+echo "🛠️ ZFS Backup Started at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 
 for DS in "${DATASETS[@]}"; do
@@ -262,7 +264,7 @@ echo ""
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "----------------------------------------------------"
 echo ""
-echo "🚀 ZFS Backup Finished at $(date +'%H:%M:%S %d.%m.%Y')"
+echo "🚀 ZFS Backup Finished at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
