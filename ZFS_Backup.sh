@@ -229,16 +229,16 @@ for DS in "${DATASETS[@]}"; do
         echo "🧹 Pruning manual snapshots locally..."
 
         # Always rotate Source
-        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         
         # Rotate Local destination (only if successful)
         if [[ $local_stat -eq 1 ]]; then
-            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@manual_sync_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         fi
 
         # Rotate Remote destination (only if successful)
         if [[ $remote_stat -eq 1 ]]; then
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@manual_sync_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
         
         echo "✅ Pruning complete!"
