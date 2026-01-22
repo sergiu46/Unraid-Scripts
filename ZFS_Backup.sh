@@ -127,7 +127,7 @@ replicate_with_repair() {
 # MAIN EXECUTION
 echo "----------------------------------------------------"
 echo ""
-echo "🛠️ ZFS Backup Started at $(date +%H:%M:%S)"
+echo "🛠️ ZFS Backup Started at $(date +'%H:%M:%S %d.%m.%Y')"
 echo ""
 
 for DS in "${DATASETS[@]}"; do
@@ -262,7 +262,7 @@ echo ""
 echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "----------------------------------------------------"
 echo ""
-echo "🚀 ZFS Backup Finished at $(date +%H:%M:%S)"
+echo "🚀 ZFS Backup Finished at $(date +'%H:%M:%S %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
 unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
