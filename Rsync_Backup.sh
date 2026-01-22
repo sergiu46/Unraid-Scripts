@@ -20,24 +20,22 @@
 # REMOTE_USER="root"
 # REMOTE_BASE_DIR="/mnt/user/Backup"
 #
-# # System
-# # Debug "true" or "false" 
-# # Notifications "all" or "error"
-# DEBUG=false
+# # System. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
+# DEBUG=true
 # NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
 # SCRIPT="$SCRIPT_DIR/Rsync_Backup.sh"
+# LOCKFILE="$SCRIPT_DIR/Rsync_Backup.lock"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Rsync_Backup.sh"
 #
 # # Download script
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT" ]] || \
-#     curl -s -fL "$URL" -o "$SCRIPT" || \
-#     { echo "❌ Download Failed"; exit 1; }
-# LOCKFILE="$SCRIPT_DIR/Rsync_Backup.lock" 
+# [[ -f "$SCRIPT" ]] || curl -s -fL "$URL" -o "$SCRIPT" || \
+# { echo "❌ Download Failed"; exit 1; }
 # exec 200>"$LOCKFILE" 
-# flock -n 200 || { echo "❌ Script already running"; exit 1; }
+# flock -n 200 || \
+# { echo "❌ Script already running"; exit 1; }
 # source "$SCRIPT"
 
 ##################################################################
