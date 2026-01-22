@@ -72,7 +72,7 @@ unraid_notify() {
 # --- MAIN EXECUTION ---
 echo "----------------------------------------------------"
 echo ""
-echo "🛠️ Rsync Backup Started at $(date +%H:%M:%S)"
+echo "🛠️ Rsync Backup Started at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
 # 1. Verification Handshake
@@ -136,7 +136,7 @@ echo "📊 FINAL SUMMARY:"
 echo -e "$SUMMARY_LOG"
 echo "----------------------------------------------------"
 echo ""
-echo "🏁 Rsync Backup Finished at $(date +%H:%M:%S)"
+echo "🏁 Rsync Backup Finished at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
 
