@@ -7,36 +7,37 @@
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 
+
 # #!/bin/bash
 #
-# # List only the local folders you want to back up
+# # List only the local folders to be backed up.
 # LOCAL_FOLDERS=(
 #     "/mnt/user/Pictures"
 #     "/mnt/user/Videos"
 # )
 #
-# # CONFIGURATION
+# # Remote config.
 # REMOTE_HOST="192.168.1.50"
 # REMOTE_USER="root"
 # REMOTE_BASE_DIR="/mnt/user/Backup"
 #
-# # System. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
-# DEBUG=true
+# # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
+# DEBUG="false"
 # NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
-# SCRIPT="$SCRIPT_DIR/Rsync_Backup.sh"
-# LOCKFILE="$SCRIPT_DIR/Rsync_Backup.lock"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Rsync_Backup.sh"
 #
-# # Download script
+# # Download and lock file
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT" ]] || curl -s -fL "$URL" -o "$SCRIPT" || \
+# [[ -f "$SCRIPT_DIR/Rsync_Backup.sh" ]] || \
+# curl -s -fL "$URL" -o "$SCRIPT_DIR/Rsync_Backup.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
-# exec 200>"$LOCKFILE" 
+# exec 200>"$SCRIPT_DIR/Rsync_Backup.lock" 
 # flock -n 200 || \
 # { echo "❌ Script already running"; exit 1; }
-# source "$SCRIPT"
+# source "$SCRIPT_DIR/Rsync_Backup.sh"
+
 
 ##################################################################
 
