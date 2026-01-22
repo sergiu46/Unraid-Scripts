@@ -33,7 +33,7 @@
 # KEEP_YEARLY="0"
 #
 # # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
-# DEBUG=false
+# DEBUG="false"
 # NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
