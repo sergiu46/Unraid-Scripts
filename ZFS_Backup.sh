@@ -31,23 +31,22 @@
 # KEEP_MONTHLY="0"
 # KEEP_YEARLY="0"
 #
-# # System. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
-# DEBUG=true
+# # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
+# DEBUG=false
 # NOTIFY_LEVEL="error"
 # SCRIPT_DIR="/dev/shm/scripts"
-# SCRIPT="$SCRIPT_DIR/ZFS_Backup.sh"
-# LOCKFILE="$SCRIPT_DIR/ZFS_Backup.lock"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/ZFS_Backup.sh"
 #
-# # Download script
+# # Download and lock file
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT" ]] || curl -s -fL "$URL" -o "$SCRIPT" || \
+# [[ -f "$SCRIPT_DIR/ZFS_Backup.sh" ]] || \
+# curl -s -fL "$URL" -o "$SCRIPT_DIR/ZFS_Backup.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
-# exec 200>"$LOCKFILE" 
+# exec 200>"$SCRIPT_DIR/ZFS_Backup.lock" 
 # flock -n 200 || \
 # { echo "❌ Script already running"; exit 1; }
-# source "$SCRIPT"
+# source "$SCRIPT_DIR/ZFS_Backup.sh"
 
 ##################################################################
 
