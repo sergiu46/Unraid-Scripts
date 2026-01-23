@@ -3,41 +3,39 @@
 # 
 # HOW TO USE:
 # Create a new "User Script" in Unraid and paste the code below.
-#
+# Fill variables with desired values.
+
+
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
 #
-# # --- AUTHENTICATION ---
+# # Cloudflare setup
 # CF_API_TOKEN="YOUR_TOKEN"
 # ZONE_ID="YOUR_ZONE_ID"
 # DOMAIN="example.com"
-#
-# # --- NETWORK SETTINGS ---
-# HOME_ROUTER_IP="192.168.1.1"
 # TUNNEL="your-id.cfargotunnel.com"
 # PROXIED="false"
 #
-# # --- BEHAVIOR ---
+# # Behavior
 # CHANGE_DNS_RECORDS="true"  # "true" = Full Auto. "false" = Update IP only, BLOCK Mode Switches.
 # NOTIFICATION_TYPE="all"    # Options: "all", "error", "none"
 # DEBUG="false"              # Set to "true" to bypass cache and show logs
 #
-# # --- SYSTEM ---
+# # Download script
 # DIR="/dev/shm/scripts"
-# SCRIPT="$DIR/Cloudflare_DDNS.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
 #
 # [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
 # mkdir -p "$DIR"
-# [[ -f "$SCRIPT" ]] || \
-#   curl -s -fL "$URL" -o "$SCRIPT" || \
-#   { echo "❌ Download Failed"; exit 1; }
-# source "$SCRIPT"
-#
+# [[ -f "$DIR/Cloudflare_DDNS.sh" ]] || \
+# curl -s -fL "$URL" -o "$DIR/Cloudflare_DDNS.sh" || \
+# { echo "❌ Download Failed"; exit 1; }
+# source "$DIR/Cloudflare_DDNS.sh"
+
+
 #########################################################################
 
 #!/bin/bash
-
 
 # Cache Setup
 CACHE_DIR="$DIR/cache"
@@ -45,18 +43,13 @@ SAFE_NAME=$(echo "$DOMAIN" | sed 's/\*/wildcard/g; s/\./_/g')
 IP_CACHE="$CACHE_DIR/${SAFE_NAME}.ip"
 mkdir -p "$CACHE_DIR"
 
-# ==========================================
 # PRE-FLIGHT CHECKS
-# ==========================================
 if ! command -v jq &> /dev/null || ! command -v traceroute &> /dev/null; then
     echo "❌ Error: 'jq' or 'traceroute' is not installed."
     exit 1
 fi
 
-# ==========================================
 # FUNCTIONS
-# ==========================================
-
 debug_log() {
     [ "$DEBUG" = "true" ] && echo -e "DEBUG: $1"
 }
@@ -126,9 +119,8 @@ unraid_notify() {
     fi
 }
 
-# ==========================================
+
 # MAIN EXECUTION
-# ==========================================
 main() {
     echo "🔍 DDNS Check: $DOMAIN"
 
@@ -141,6 +133,10 @@ main() {
         return 0
     fi
 
+    # Detect home router IP
+    HOME_ROUTER_IP=$(ip route show default | awk '/default/ {print $3}')
+    [ "$DEBUG" != "true" ] && echo "📶 Home router IP: $HOME_ROUTER_IP"
+    
    # ENHANCED CACHE & IP CHECK
     if [[ -f "$IP_CACHE" ]]; then
         OLD_IP=$(cat "$IP_CACHE")
