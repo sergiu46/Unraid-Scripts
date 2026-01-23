@@ -55,7 +55,7 @@ debug_log() {
 }
 
 get_public_ip() { 
-    curl -s https://www.cloudflare.com/cdn-cgi/trace | grep -Po 'ip=\K.*'
+    curl -s -4 https://www.cloudflare.com/cdn-cgi/trace | grep -Po 'ip=\K.*'
 }
 
 is_cgnat() {
