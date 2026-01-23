@@ -51,7 +51,7 @@ fi
 
 # FUNCTIONS
 debug_log() {
-    [ "$DEBUG" = "true" ] && echo -e "DEBUG: $1"
+    [ "$DEBUG" = "true" ] && echo -e "🪲 $1"
 }
 
 get_public_ip() { 
@@ -135,7 +135,7 @@ main() {
 
     # Detect home router IP
     HOME_ROUTER_IP=$(ip route show default | awk '/default/ {print $3}')
-    [ "$DEBUG" != "true" ] && echo "📶 Home router IP: $HOME_ROUTER_IP"
+    debug_log "Router IP:$HOME_ROUTER_IP"
     
    # ENHANCED CACHE & IP CHECK
     if [[ -f "$IP_CACHE" ]]; then
