@@ -135,7 +135,7 @@ main() {
 
     # Detect home router IP
     HOME_ROUTER_IP=$(ip route show default | awk '/default/ {print $3}')
-    debug_log "Router IP:$HOME_ROUTER_IP"
+    debug_log "Router IP: $HOME_ROUTER_IP"
     
    # ENHANCED CACHE & IP CHECK
     if [[ -f "$IP_CACHE" ]]; then
