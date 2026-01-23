@@ -23,7 +23,6 @@
 # DEBUG="false"              # Set to "true" to bypass cache and show logs
 #
 # # --- SYSTEM ---
-# CACHE_DIR="/dev/shm/Cloudflare"
 # DIR="/dev/shm/scripts"
 # SCRIPT="$DIR/Cloudflare_DDNS.sh"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
@@ -39,7 +38,9 @@
 
 #!/bin/bash
 
+
 # Cache Setup
+CACHE_DIR="$DIR/cache"
 SAFE_NAME=$(echo "$DOMAIN" | sed 's/\*/wildcard/g; s/\./_/g')
 IP_CACHE="$CACHE_DIR/${SAFE_NAME}.ip"
 mkdir -p "$CACHE_DIR"
@@ -130,7 +131,6 @@ unraid_notify() {
 # ==========================================
 main() {
     echo "🔍 DDNS Check: $DOMAIN"
-    [ "$DEBUG" = "true" ] && rm -f "$IP_CACHE"
 
     CURRENT_IP=$(get_public_ip)
     [ -z "$CURRENT_IP" ] && { echo "❌ IP Fail"; return 1; }
