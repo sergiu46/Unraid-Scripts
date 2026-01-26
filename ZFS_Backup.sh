@@ -240,8 +240,6 @@ for DS in "${DATASETS[@]}"; do
         if [[ $remote_stat -eq 1 ]]; then
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
-        
-        echo "✅ Pruning complete!"
     else
         echo "❌ Backup enabled but failed. Skipping rotation to preserve history."
         ((FAILURE_TOTAL++))
