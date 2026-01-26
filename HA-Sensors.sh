@@ -19,23 +19,23 @@
 #
 # # Script config. DEBUG "true" or "false".
 # DEBUG="false"
-# SCRIPT_DIR="/dev/shm/HA_Sensors"
+# DIR="/dev/shm/HA_Sensors"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/HA-Sensors.sh"
 #
 # # Download and execute script
-# [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
-# mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT_DIR/HA-Sensors.sh" ]] || \
-# curl -s -fL "$URL" -o "$SCRIPT_DIR/HA-Sensors.sh" || \
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
+# mkdir -p "$DIR"
+# [[ -f "$DIR/HA-Sensors.sh" ]] || \
+# curl -s -fL "$URL" -o "$DIR/HA-Sensors.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
-# source "$SCRIPT_DIR/HA-Sensors.sh"
+# source "$DIR/HA-Sensors.sh"
 
 
 #########################################################################
 
 #!/bin/bash
 
-SENSORS_DIR="$SCRIPT_DIR\Sensors"
+SENSORS_DIR="$DIR\Sensors"
 
 [[ "$DEBUG" == "true" ]] && rm -rf "$SENSORS_DIR"
 
