@@ -24,19 +24,19 @@
 # # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
 # DEBUG="false"
 # NOTIFY_LEVEL="error"
-# SCRIPT_DIR="/dev/shm/scripts"
+# DIR="/dev/shm/Rsync_Backup"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Rsync_Backup.sh"
 #
 # # Download and lock file
-# [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
-# mkdir -p "$SCRIPT_DIR"
-# [[ -f "$SCRIPT_DIR/Rsync_Backup.sh" ]] || \
-# curl -s -fL "$URL" -o "$SCRIPT_DIR/Rsync_Backup.sh" || \
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
+# mkdir -p "$DIR"
+# [[ -f "$DIR/Rsync_Backup.sh" ]] || \
+# curl -s -fL "$URL" -o "$DIR/Rsync_Backup.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
-# exec 200>"$SCRIPT_DIR/Rsync_Backup.lock" 
+# exec 200>"$DIR/Rsync_Backup.lock" 
 # flock -n 200 || \
 # { echo "❌ Script already running"; exit 1; }
-# source "$SCRIPT_DIR/Rsync_Backup.sh"
+# source "$DIR/Rsync_Backup.sh"
 
 
 ##################################################################
