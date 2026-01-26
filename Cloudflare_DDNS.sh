@@ -23,7 +23,7 @@
 # DEBUG="false"              # Set to "true" to bypass cache and show logs
 #
 # # Download script
-# DIR="/dev/shm/scripts"
+# DIR="/dev/shm/Cloudflare"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Cloudflare_DDNS.sh"
 #
 # [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
