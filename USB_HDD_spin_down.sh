@@ -41,7 +41,6 @@
 
 #!/bin/bash
 
-STATUS_DIR="${DIR}/status"
 
 echo "💤 USB HDD spin-down."
 # Determine Spindown Delay based on Time of Day
