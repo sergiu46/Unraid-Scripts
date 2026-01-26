@@ -29,7 +29,7 @@
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/USB_HDD_spin_down.sh"
 #
 # # Download and execute script
-# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
+# [[ "$DEBUG" == "true" ]] && rm -f "$DIR/HDD_spin_down.sh"
 # mkdir -p "$DIR"
 # [[ -f "$DIR/HDD_spin_down.sh" ]] || \
 # curl -s -fL "$URL" -o "$DIR/HDD_spin_down.sh" || \
