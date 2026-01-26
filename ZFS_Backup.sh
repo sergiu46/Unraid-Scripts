@@ -54,6 +54,9 @@
 
 #!/bin/bash
 
+
+mkdir -p "$DIR/Sanoid"
+
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
@@ -157,7 +160,7 @@ for DS in "${DATASETS[@]}"; do
                 echo "✅ Local sync successful!"
                 echo ""
                 local_stat=1
-                DST_RAM_LOCAL="/dev/shm/Sanoid/dst_local_${DS//\//_}"
+                DST_RAM_LOCAL="$DIR/Sanoid/dst_local_${DS//\//_}"
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
@@ -221,7 +224,7 @@ for DS in "${DATASETS[@]}"; do
         ((SUCCESS_TOTAL++))
         
         # Sanoid Maintenance for Source
-        SRC_RAM="/dev/shm/Sanoid/src_${SRC_DS//\//_}"
+        SRC_RAM="$DIR/Sanoid/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
