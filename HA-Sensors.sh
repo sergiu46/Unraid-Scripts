@@ -7,6 +7,8 @@
 # in Unraid and paste the code below.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
+
+
 # #!/bin/bash
 #
 # # ID of the drives to be monitores
@@ -17,8 +19,7 @@
 #
 # # Script config. DEBUG "true" or "false".
 # DEBUG="false"
-# SENSORS_DIR="/dev/shm/ha-sensors"
-# SCRIPT_DIR="/dev/shm/scripts"
+# SCRIPT_DIR="/dev/shm/HA_Sensors"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/HA-Sensors.sh"
 #
 # # Download and execute script
@@ -28,10 +29,14 @@
 # curl -s -fL "$URL" -o "$SCRIPT_DIR/HA-Sensors.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
 # source "$SCRIPT_DIR/HA-Sensors.sh"
-#
+
+
 #########################################################################
 
 #!/bin/bash
+
+SENSORS_DIR="$SCRIPT_DIR\Sensors"
+
 [[ "$DEBUG" == "true" ]] && rm -rf "$SENSORS_DIR"
 
 echo "🏠 Updating Home Assistant Sensors!"
