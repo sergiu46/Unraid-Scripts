@@ -185,7 +185,7 @@ for DS in "${DATASETS[@]}"; do
                 
                 # --- ADD THIS START ---
                 echo "🧹 Pruning snapshots on remote host..."
-                DST_RAM_REMOTE="/dev/shm/Sanoid/dst_remote_${DS//\//_}"
+                DST_RAM_REMOTE="$DIR/dst_remote_${DS//\//_}"
                 create_sanoid_config "$REMOTE_DS" "$DST_RAM_REMOTE"
                 
                 # Copy config to remote and run sanoid there
@@ -224,7 +224,7 @@ for DS in "${DATASETS[@]}"; do
         ((SUCCESS_TOTAL++))
         
         # Sanoid Maintenance for Source
-        SRC_RAM="$DIR/Sanoid/src_${SRC_DS//\//_}"
+        SRC_RAM="$DIR/src_${SRC_DS//\//_}"
         create_sanoid_config "$SRC_DS" "$SRC_RAM"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
