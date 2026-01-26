@@ -35,7 +35,7 @@
 
 #!/bin/bash
 
-SENSORS_DIR="$DIR\Sensors"
+SENSORS_DIR="$DIR/Sensors"
 
 [[ "$DEBUG" == "true" ]] && rm -rf "$SENSORS_DIR"
 
