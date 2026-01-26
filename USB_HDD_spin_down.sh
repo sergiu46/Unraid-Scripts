@@ -66,10 +66,10 @@ do_device() {
     local device_id=$1
     device=`ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4`
     filename="${STATUS_DIR}/diskaccess-${device_id}.status"
-
+    echo "$filename"
     # Check if the drive is awake or asleep
     is_awake=`smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'`
-
+    echo "$is_awake"
     if [ "${is_awake}" == "1" ]; then
         if [ "$DEBUG" = true ]; then
             echo "${device} is awake"
