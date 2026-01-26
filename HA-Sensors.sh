@@ -9,34 +9,31 @@
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 # #!/bin/bash
 #
-# # Uncomment to enable debug mode
-# # DEBUG=true
-#
 # # ID of the drives to be monitores
 # drives=(
 #     "THNSN5256GPUK_NVMe_TOSHIBA_256GB_XXXXXXXXXXX"
 #     "WD_Elements_SE_2622_XXXXXXXXXXXXXXXXXXXXXXXX"
 # )
 #
-# # Define sensors directory
+# # Script config. DEBUG "true" or "false".
+# DEBUG="false"
 # SENSORS_DIR="/dev/shm/ha-sensors"
-#
-# # GitHub script
-# DIR="/dev/shm/scripts"
-# SCRIPT="$TEMP_DIR/HA-Sensors.sh"
+# SCRIPT_DIR="/dev/shm/scripts"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/HA-Sensors.sh"
 #
 # # Download and execute script
-# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR" && rm -rf "$SENSORS_DIR"
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
 # mkdir -p "$DIR"
-# [[ -f "$SCRIPT" ]] || \
-#     curl -s -fL "$URL" -o "$SCRIPT" || \
-#     { echo "❌ Download Failed"; exit 1; }
-# source "$SCRIPT"
+# [[ -f "$TEMP_DIR/HA-Sensors.sh" ]] || \
+# curl -s -fL "$URL" -o "$TEMP_DIR/HA-Sensors.sh" || \
+# { echo "❌ Download Failed"; exit 1; }
+# source "$TEMP_DIR/HA-Sensors.sh"
 #
 #########################################################################
 
 #!/bin/bash
+
+[[ "$DEBUG" == "true" ]] && rm -rf "$SENSORS_DIR"
 
 echo "🏠 Updating Home Assistant Sensors!"
 # Create sensors directory
@@ -44,6 +41,9 @@ mkdir -p "${SENSORS_DIR}"
 
 # CPU Temp
 sensors | awk '/CPU Temp/ {gsub(/[^0-9.]/, "", $3); print $3}' > "$SENSORS_DIR/cpu_temp"
+
+#MB Temp
+sensors | grep 'MB Temp' | awk '{print $3}' | tr -d '+°C' > "$SENSORS_DIR/mb_temp"
 
 # Memory usage
 free | awk '/Mem:/ {printf "%.2f\n", $3/$2 * 100}' > "$SENSORS_DIR/memory_usage"
@@ -60,7 +60,6 @@ du -s /dev/shm | awk '{printf "%.2f\n", $1/1024}' > "$SENSORS_DIR/shm_size"
 
 # Extract fan speeds and save each one to a separate file
 sensors | awk '/Array Fan:/ {gsub(/[^0-9]/, "", $3); print $3 > "'"$SENSORS_DIR"'/Array_Fan_" NR}'
-
 
 # Get drive temp and state
 drive_temp_state() {
