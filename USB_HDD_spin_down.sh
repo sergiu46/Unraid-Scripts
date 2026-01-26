@@ -41,15 +41,9 @@
 
 #!/bin/bash
 
+STATUS_DIR="$DIR/status"
 
 echo "💤 USB HDD spin-down."
-
-# Initialization
-STATUS_DIR="${DIR}/status"
-mkdir -p "${STATUS_DIR}" 
-current=$(date)
-
-
 # Determine Spindown Delay based on Time of Day
 current_time="$(date +'%k%M')"
 if [ "${current_time}" -ge "${DAY_HOUR}" ] && [ "${current_time}" -lt "${NIGHT_HOUR}" ]; then 
@@ -60,58 +54,63 @@ else
     MODE="NIGHT"
 fi
 
-debug_log() {
-    [ "$DEBUG" = "true" ] && echo -e "🪲 $1"
-}
+# Set directory for status
+mkdir -p "${STATUS_DIR}" 
+
+current=`date`
 
 do_device() {
     local device_id=$1
-    
-    # Improved device detection (finds sda, sdb, sdaa, etc. safely)
-    device=$(basename $(readlink -f /dev/disk/by-id/${device_id}))
-    
+    device=`ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4`
     filename="${STATUS_DIR}/diskaccess-${device_id}.status"
 
     # Check if the drive is awake or asleep
-    is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
-    
+    is_awake=`smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'`
+
     if [ "${is_awake}" == "1" ]; then
-        debug_log "${device} is awake"
+        if [ "$DEBUG" = true ]; then
+            echo "${device} is awake"
+        fi
+
         stat_new=$(grep "${device} " /proc/diskstats | tr -dc "[:digit:]")
 
         if [ ! -f "${filename}" ]; then
-            echo "${current} - ${filename} file does not exist; creating it now."
-            echo "${stat_new}" > "${filename}"
+            echo ${current} "- ${filename} file does not exist; creating it now."
+            echo ${stat_new} > ${filename}
         else
-            # FIXED LINE BELOW ($ instead of &)
-            stat_old=$(cat "${filename}" | tr -dc "[:digit:]")
+            stat_old=`cat ${filename} | tr -dc "[:digit:]"`
 
             # Calculate time since last use
             current_time=$(date +%s)
-            last_mod=$(stat "${filename}" -c %Y)
+            last_mod=$(stat ${filename} -c %Y)
             seconds_ago=$(expr $current_time - $last_mod)
             minutes_ago=$(expr $seconds_ago / 60)
 
-            debug_log "${device} old stat: ${stat_old}"
-            debug_log "${device} new stat: ${stat_new}"
-            debug_log "${device} new stat modified ${minutes_ago} minutes ago"
+            if [ "$DEBUG" = true ]; then
+                echo "${device} old stat: ${stat_old}"
+                echo "${device} new stat: ${stat_new}"
+                echo "${device} new stat modified ${minutes_ago} minutes ago"
+            fi
 
             if [ "${stat_old}" == "${stat_new}" ]; then
                 if [ $minutes_ago -ge $SPINDOWN_DELAY ]; then
-                    echo "${current} - Drive /dev/${device} is awake and hasn't been used in ${minutes_ago} minutes; spinning down"
+                    echo ${current} "- Drive /dev/${device} is awake and hasn't been used in ${minutes_ago} minutes; spinning down"
                     hdparm -y /dev/${device} > /dev/null 2>&1
                 else
-                    echo "${current} - Drive /dev/${device} was last used ${minutes_ago} minutes ago (Setting: $SPINDOWN_DELAY)"
+                    echo ${current} "- Drive /dev/${device} was last used ${minutes_ago} minutes ago, less than spindown setting ($SPINDOWN_DELAY)"
                 fi
             else
-                echo "${current} - Drive /dev/${device} has been used..."
-                echo "${stat_new}" > "${filename}"
+                echo ${current} "- Drive /dev/${device} has been used..."
+                echo ${stat_new} > ${filename}
             fi
         fi
     else
-        debug_log "${device} is asleep"
+        if [ "$DEBUG" = true ]; then
+            echo "${device} is asleep"
+        fi
     fi
 }
+
 # Process each drive
 for device_id in "${drives[@]}"
 do
@@ -119,4 +118,3 @@ do
 done
 
 echo ""
-
