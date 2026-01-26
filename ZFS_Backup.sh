@@ -157,7 +157,7 @@ for DS in "${DATASETS[@]}"; do
                 echo "✅ Local sync successful!"
                 echo ""
                 local_stat=1
-                DST_RAM_LOCAL="$DIR/Sanoid/dst_local_${DS//\//_}"
+                DST_RAM_LOCAL="$DIR/dst_local_${DS//\//_}"
                 create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
