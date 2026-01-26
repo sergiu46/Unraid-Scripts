@@ -47,7 +47,7 @@ echo "💤 USB HDD spin-down."
 # Initialization
 STATUS_DIR="${DIR}/status"
 mkdir -p "${STATUS_DIR}" 
-current=`date`
+current="date"
 
 
 # Determine Spindown Delay based on Time of Day
@@ -60,16 +60,18 @@ else
     MODE="NIGHT"
 fi
 
-
+debug_log() {
+    [ "$DEBUG" = "true" ] && echo -e "🪲 $1"
+}
 
 do_device() {
     local device_id=$1
-    device=`ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4`
+    device="ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4"
     filename="${STATUS_DIR}/diskaccess-${device_id}.status"
-    echo "$filename"
+    debug_log "Filename: $filename"
     # Check if the drive is awake or asleep
-    is_awake=`smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'`
-    echo "$is_awake"
+    is_awake="smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'"
+    debug_log "Is awake: $is_awake"
     if [ "${is_awake}" == "1" ]; then
         if [ "$DEBUG" = true ]; then
             echo "${device} is awake"
@@ -81,7 +83,7 @@ do_device() {
             echo ${current} "- ${filename} file does not exist; creating it now."
             echo ${stat_new} > ${filename}
         else
-            stat_old=`cat ${filename} | tr -dc "[:digit:]"`
+            stat_old="cat ${filename} | tr -dc "[:digit:]""
 
             # Calculate time since last use
             current_time=$(date +%s)
@@ -89,11 +91,10 @@ do_device() {
             seconds_ago=$(expr $current_time - $last_mod)
             minutes_ago=$(expr $seconds_ago / 60)
 
-            if [ "$DEBUG" = true ]; then
-                echo "${device} old stat: ${stat_old}"
-                echo "${device} new stat: ${stat_new}"
-                echo "${device} new stat modified ${minutes_ago} minutes ago"
-            fi
+            debug_log "${device} old stat: ${stat_old}"
+            debug_log "${device} new stat: ${stat_new}"
+            debug_log "${device} new stat modified ${minutes_ago} minutes ago"
+            
 
             if [ "${stat_old}" == "${stat_new}" ]; then
                 if [ $minutes_ago -ge $SPINDOWN_DELAY ]; then
@@ -108,9 +109,7 @@ do_device() {
             fi
         fi
     else
-        if [ "$DEBUG" = true ]; then
-            echo "${device} is asleep"
-        fi
+        debug_log "${device} is asleep"
     fi
 }
 
