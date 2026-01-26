@@ -71,10 +71,8 @@ do_device() {
     # Check if the drive is awake or asleep
     is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
     if [ "${is_awake}" == "1" ]; then
-        if [ "$DEBUG" = true ]; then
-            echo "${device} is awake"
-        fi
-
+       
+        debug_log "${device} is awake"
         stat_new=$(grep "${device} " /proc/diskstats | tr -dc "[:digit:]")
 
         if [ ! -f "${filename}" ]; then
