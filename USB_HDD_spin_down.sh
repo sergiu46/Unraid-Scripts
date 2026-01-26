@@ -43,6 +43,13 @@
 
 
 echo "💤 USB HDD spin-down."
+
+# Initialization
+STATUS_DIR="${DIR}/status"
+mkdir -p "${STATUS_DIR}" 
+current=`date`
+
+
 # Determine Spindown Delay based on Time of Day
 current_time="$(date +'%k%M')"
 if [ "${current_time}" -ge "${DAY_HOUR}" ] && [ "${current_time}" -lt "${NIGHT_HOUR}" ]; then 
@@ -53,10 +60,7 @@ else
     MODE="NIGHT"
 fi
 
-# Set directory for status
-mkdir -p "${STATUS_DIR}" 
 
-current=`date`
 
 do_device() {
     local device_id=$1
