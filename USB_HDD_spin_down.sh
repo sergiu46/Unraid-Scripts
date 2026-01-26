@@ -47,7 +47,7 @@ echo "💤 USB HDD spin-down."
 # Initialization
 STATUS_DIR="${DIR}/status"
 mkdir -p "${STATUS_DIR}" 
-current="date"
+current=$(date)
 
 
 # Determine Spindown Delay based on Time of Day
@@ -66,11 +66,11 @@ debug_log() {
 
 do_device() {
     local device_id=$1
-    device="ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4"
+    device=$(ls -l /dev/disk/by-id/ | grep ${device_id} | head -1 | tail -c4)
     filename="${STATUS_DIR}/diskaccess-${device_id}.status"
     debug_log "Filename: $filename"
     # Check if the drive is awake or asleep
-    is_awake="smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE'"
+    is_awake=$(smartctl --nocheck standby -i /dev/${device} | grep 'Power mode is' | egrep -c 'ACTIVE|IDLE')
     debug_log "Is awake: $is_awake"
     if [ "${is_awake}" == "1" ]; then
         if [ "$DEBUG" = true ]; then
@@ -83,7 +83,7 @@ do_device() {
             echo ${current} "- ${filename} file does not exist; creating it now."
             echo ${stat_new} > ${filename}
         else
-            stat_old="cat ${filename} | tr -dc "[:digit:]""
+            stat_old=&(cat ${filename} | tr -dc "[:digit:]")
 
             # Calculate time since last use
             current_time=$(date +%s)
