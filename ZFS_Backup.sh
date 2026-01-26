@@ -54,9 +54,6 @@
 
 #!/bin/bash
 
-
-mkdir -p "$DIR/Sanoid"
-
 # TRACKING VARIABLES
 SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
