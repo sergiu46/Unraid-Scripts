@@ -6,6 +6,8 @@
 # in Unraid and paste the code below.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
+
+
 # #!/bin/bash
 #
 # # ID of the drives to be processed by script
@@ -15,32 +17,31 @@
 #   "usb-WD_My_Passport_0000_XXXXXXXXXXXXXXXXXXXXXXXX"
 # )
 #
-# # Uncomment to enable debug mode
-# # DEBUG=true
 #
 # # Delay, hours and status dir
 # DAY_DELAY=60
 # NIGHT_DELAY=30
 # DAY_HOUR='0900'
 # NIGHT_HOUR='2200'
-# STATUS_DIR="/dev/shm/hdd"
 #
-# # GitHub script
-# DIR="/dev/shm/scripts"
-# SCRIPT="$TEMP_DIR/HDD_Spindown_Logic.sh"
+# # Script config. DEBUG "true" or "false".
+# DIR="/dev/shm/HDD_spin_down"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/USB_HDD_spin_down.sh"
 #
 # # Download and execute script
 # [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
 # mkdir -p "$DIR"
-# [[ -f "$SCRIPT" ]] || \
-#     curl -s -fL "$URL" -o "$SCRIPT" || \
-#     { echo "❌ Download Failed"; exit 1; }
-# source "$SCRIPT"
-#
+# [[ -f "$DIR/HDD_spin_down.sh" ]] || \
+# curl -s -fL "$URL" -o "$DIR/HDD_spin_down.sh" || \
+# { echo "❌ Download Failed"; exit 1; }
+# source "$DIR/HDD_spin_down.sh"
+
+
 #########################################################################
 
 #!/bin/bash
+
+STATUS_DIR="$DIR/Status"
 
 echo "💤 USB HDD spin-down."
 # Determine Spindown Delay based on Time of Day
