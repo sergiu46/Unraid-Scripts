@@ -22,17 +22,16 @@
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/HA-Sensors.sh"
 #
 # # Download and execute script
-# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
-# mkdir -p "$DIR"
-# [[ -f "$TEMP_DIR/HA-Sensors.sh" ]] || \
-# curl -s -fL "$URL" -o "$TEMP_DIR/HA-Sensors.sh" || \
+# [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
+# mkdir -p "$SCRIPT_DIR"
+# [[ -f "$SCRIPT_DIR/HA-Sensors.sh" ]] || \
+# curl -s -fL "$URL" -o "$SCRIPT_DIR/HA-Sensors.sh" || \
 # { echo "❌ Download Failed"; exit 1; }
-# source "$TEMP_DIR/HA-Sensors.sh"
+# source "$SCRIPT_DIR/HA-Sensors.sh"
 #
 #########################################################################
 
 #!/bin/bash
-
 [[ "$DEBUG" == "true" ]] && rm -rf "$SENSORS_DIR"
 
 echo "🏠 Updating Home Assistant Sensors!"
