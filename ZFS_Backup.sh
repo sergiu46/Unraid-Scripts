@@ -180,24 +180,26 @@ for DS in "${DATASETS[@]}"; do
                 echo ""
                 remote_stat=1
                 
-                # --- REMOTE PRUNING WITH HOST-SPECIFIC CONFIG ---
+                # --- UNIQUE HOST CONFIG LOGIC ---
                 echo "🧹 Pruning snapshots on remote host..."
                 MY_HOSTNAME=$(hostname)
-                REMOTE_CONF_DIR="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
                 
-                DST_RAM_REMOTE="/dev/shm/Sanoid/dst_remote_${DS//\//_}"
-                create_sanoid_config "$REMOTE_DS" "$DST_RAM_REMOTE"
+                # Local temp folder inside your $DIR variable
+                LOCAL_SANOID_TEMP="$DIR/sanoid_remote_${DS//\//_}"
+                # Remote temp folder inside /tmp with hostname to prevent collisions
+                REMOTE_SANOID_TEMP="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
+
+                # Generate config locally first
+                create_sanoid_config "$REMOTE_DS" "$LOCAL_SANOID_TEMP"
                 
-                # Create a unique directory on the remote host for THIS specific host and dataset
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_CONF_DIR"
-                scp "$DST_RAM_REMOTE/"* "${REMOTE_USER}@${REMOTE_HOST}:$REMOTE_CONF_DIR/"
+                # Push to unique remote path and prune
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_SANOID_TEMP"
+                scp "$LOCAL_SANOID_TEMP/"* "${REMOTE_USER}@${REMOTE_HOST}:$REMOTE_SANOID_TEMP/"
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir $REMOTE_SANOID_TEMP --prune-snapshots"
                 
-                # Run sanoid using the unique remote directory
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir $REMOTE_CONF_DIR --prune-snapshots"
-                
-                # Cleanup
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "rm -rf $REMOTE_CONF_DIR"
-                rm -rf "$DST_RAM_REMOTE"
+                # Cleanup both sides
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "rm -rf $REMOTE_SANOID_TEMP"
+                rm -rf "$LOCAL_SANOID_TEMP"
             else
                 remote_stat=3
             fi
