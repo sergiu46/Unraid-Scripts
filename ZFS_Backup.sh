@@ -180,16 +180,23 @@ for DS in "${DATASETS[@]}"; do
                 echo ""
                 remote_stat=1
                 
-                # --- ADD THIS START ---
+                # --- REMOTE PRUNING WITH HOST-SPECIFIC CONFIG ---
                 echo "🧹 Pruning snapshots on remote host..."
-                DST_RAM_REMOTE="$DIR/dst_remote_${DS//\//_}"
+                MY_HOSTNAME=$(hostname)
+                REMOTE_CONF_DIR="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
+                
+                DST_RAM_REMOTE="/dev/shm/Sanoid/dst_remote_${DS//\//_}"
                 create_sanoid_config "$REMOTE_DS" "$DST_RAM_REMOTE"
                 
-                # Copy config to remote and run sanoid there
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p /tmp/sanoid_config"
-                scp "$DST_RAM_REMOTE/"* "${REMOTE_USER}@${REMOTE_HOST}:/tmp/sanoid_config/"
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir /tmp/sanoid_config --prune-snapshots"
+                # Create a unique directory on the remote host for THIS specific host and dataset
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_CONF_DIR"
+                scp "$DST_RAM_REMOTE/"* "${REMOTE_USER}@${REMOTE_HOST}:$REMOTE_CONF_DIR/"
                 
+                # Run sanoid using the unique remote directory
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir $REMOTE_CONF_DIR --prune-snapshots"
+                
+                # Cleanup
+                ssh "${REMOTE_USER}@${REMOTE_HOST}" "rm -rf $REMOTE_CONF_DIR"
                 rm -rf "$DST_RAM_REMOTE"
             else
                 remote_stat=3
