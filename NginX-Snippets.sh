@@ -1,3 +1,34 @@
+##########################################################################
+# CLOUDFLARE DDNS
+# 
+# HOW TO USE:
+# Create a new "User Script" in Unraid and paste the code below.
+# Fill variables with desired values.
+#
+# --- COPY THIS TO UNRAID USER SCRIPTS ---
+
+
+# #!/bin/bash
+#
+# # --- SETTINGS ---
+# CONTAINER_NAME="NPM-Official"
+# SNIPPETS_DIR="/mnt/user/appdata/NPM-Official/data/nginx/snippets"
+# SNIPPETS_URL="https://github.com/sergiu46/Unraid-Scripts/tree/main/NginX-Snippets"
+#
+# # Script config
+# DEBUG="false"
+# SCRIPT_DIR="/dev/shm/NginX-Snippets"
+# SCRIPT_URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/NginX-Snippets.sh"
+#
+# # Download and execute logic
+# [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
+# mkdir -p "$SCRIPT_DIR"
+# curl -s -fL "$SCRIPT_URL" -o "$SCRIPT_DIR/NginX-Snippets.sh" || { echo "❌ Logic Download Failed"; exit 1; }
+# source "$SCRIPT_DIR/NginX-Snippets.sh"
+
+
+#########################################################################
+
 #!/bin/bash
 
 # WAIT FOR INTERNET 
