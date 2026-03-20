@@ -23,7 +23,7 @@ fi
 # Ensure local destination exists
 mkdir -p "$SNIPPETS_DIR"
 
-# 2. Fetch file list from GitHub
+# Fetch file list from GitHub
 FILE_LIST=$(curl -s "$API_URL")
 
 if echo "$FILE_LIST" | grep -q '"message": "Not Found"'; then
@@ -31,18 +31,20 @@ if echo "$FILE_LIST" | grep -q '"message": "Not Found"'; then
     return 1
 fi
 
-# 3. Download new files
-echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while read -r NAME; read -r RAW_URL; do
-    if [[ "$RAW_URL" != "null" ]]; then
-        echo "Downloading: $NAME"
-        curl -sSL "$RAW_URL" -o "$SNIPPETS_DIR/$NAME"
-    fi
-done
 
-# 4. Verification and Rollback Logic
+# Verification and Rollback Logic
 echo "Verifying container: $CONTAINER_NAME"
 
 if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+
+    # Download new files
+    echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while read -r NAME; read -r RAW_URL; do
+        if [[ "$RAW_URL" != "null" ]]; then
+            echo "Downloading: $NAME"
+            curl -sSL "$RAW_URL" -o "$SNIPPETS_DIR/$NAME"
+        fi
+    done
+
     echo "Testing Nginx configuration with new files..."
     
     # Test the configuration
@@ -50,9 +52,11 @@ if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
         echo "✅ Config is valid. Reloading Nginx..."
         docker exec "$CONTAINER_NAME" nginx -s reload
         echo "🚀 Update successful!"
-        rm -rf "$BACKUP_DIR" # Clean up backup on success
+        # rm -rf "$BACKUP_DIR"
     else
         echo "❌ ERROR: New configuration is INVALID!"
+        echo "Showing Nginx error details:"
+        docker exec "$CONTAINER_NAME" nginx -t
         echo "Restoring backup and rolling back..."
         
         # Rollback: Delete the bad files and restore from backup
@@ -61,8 +65,6 @@ if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
             cp -r "$BACKUP_DIR/." "$SNIPPETS_DIR/"
         fi
         
-        echo "Showing Nginx error details:"
-        docker exec "$CONTAINER_NAME" nginx -t
         echo "Reverting complete. Your Nginx is still running on the old config."
         exit 1
     fi
