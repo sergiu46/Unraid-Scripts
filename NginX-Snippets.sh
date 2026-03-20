@@ -1,6 +1,26 @@
 #!/bin/bash
 
-# --- HELPER: Unraid Notification ---
+# WAIT FOR INTERNET 
+MAX_NET_RETRIES=15
+NET_RETRY_COUNT=0
+NET_WAIT_SECONDS=10
+CHECK_HOST="8.8.8.8"
+
+echo "Checking internet connectivity..."
+while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
+    NET_RETRY_COUNT=$((NET_RETRY_COUNT + 1))
+    if [ $NET_RETRY_COUNT -ge $MAX_NET_RETRIES ]; then
+        echo "❌ Error: No internet connection detected after $((MAX_NET_RETRIES * NET_WAIT_SECONDS))s. Aborting."
+        send_notification "Sync Aborted" "No internet connection detected. Check your network." "alert"
+        exit 1
+    fi
+    echo "Waiting for internet... (Attempt $NET_RETRY_COUNT/$MAX_NET_RETRIES)"
+    sleep $NET_WAIT_SECONDS
+done
+echo "✅ Internet connection established."
+
+
+# Unraid Notification
 send_notification() {
     local subject=$1
     local message=$2
@@ -22,7 +42,7 @@ API_URL="https://api.github.com/repos/$USER/$REPO/contents/$FOLDER?ref=$BRANCH"
 BACKUP_DIR="$SCRIPT_DIR/Snippets_Backup"
 NEW_TEMP="$SCRIPT_DIR/Snippets_New"
 
-# --- STEP 0: WAIT FOR CONTAINER ---
+# WAIT FOR CONTAINER
 MAX_RETRIES=10
 RETRY_COUNT=0
 WAIT_SECONDS=15
@@ -40,7 +60,7 @@ while ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; do
 done
 echo "✅ $CONTAINER_NAME is online. Proceeding with sync."
 
-# --- STEP 1: BACKUP ---
+# BACKUP
 if [ -d "$SNIPPETS_DIR" ]; then
     rm -rf "$BACKUP_DIR" 
     mkdir -p "$BACKUP_DIR"
@@ -58,7 +78,7 @@ if echo "$FILE_LIST" | grep -q '"message": "Not Found"'; then
     exit 1
 fi
 
-# --- STEP 3: DOWNLOAD & SYNC ---
+# DOWNLOAD & SYNC
 rm -rf "$NEW_TEMP" && mkdir -p "$NEW_TEMP"
 
 echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while read -r NAME; read -r RAW_URL; do
@@ -72,7 +92,7 @@ done
 rm -rf "$SNIPPETS_DIR"/*
 cp -rp "$NEW_TEMP/." "$SNIPPETS_DIR/"
 
-# --- STEP 4: TEST & RELOAD ---
+# TEST & RELOAD
 echo "Testing Nginx configuration..."
 if docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; then
     echo "✅ Config valid. Reloading..."
