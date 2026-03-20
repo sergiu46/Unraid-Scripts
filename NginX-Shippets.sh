@@ -33,12 +33,19 @@ done
 
 echo "Verifying container: $CONTAINER_NAME"
 
-# Check if container exists and is running
-if docker ps --format '{{.Names}}' | grep -Aw "$CONTAINER_NAME"; then
+# We check if the container name exists in the docker ps output exactly
+if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     echo "Reloading Nginx in $CONTAINER_NAME..."
-    docker exec "$CONTAINER_NAME" nginx -s reload
-    echo "✅ Success: Reloaded."
+    # Perform a config test first to be safe
+    if docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; then
+        docker exec "$CONTAINER_NAME" nginx -s reload
+        echo "✅ Success: Config is valid and Nginx reloaded."
+    else
+        echo "❌ Error: Nginx config test failed! Not reloading."
+        docker exec "$CONTAINER_NAME" nginx -t
+    fi
 else
-    echo "❌ Error: Container '$CONTAINER_NAME' not found among active containers:"
+    echo "❌ Error: Container '$CONTAINER_NAME' not found among active containers."
+    echo "Available containers:"
     docker ps --format '{{.Names}}'
 fi
