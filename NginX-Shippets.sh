@@ -9,7 +9,7 @@ FOLDER=$(echo "$SNIPPETS_URL" | cut -d'/' -f8-)
 
 API_URL="https://api.github.com/repos/$USER/$REPO/contents/$FOLDER?ref=$BRANCH"
 
-BACKUP_DIR="$SCRIPT_DIR\Snippets_Backup"
+BACKUP_DIR="$SCRIPT_DIR/Snippets_Backup"
 
 echo "Checking GitHub API for files in: $FOLDER..."
 
