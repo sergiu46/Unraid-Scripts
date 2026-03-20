@@ -31,11 +31,14 @@ echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while
     fi
 done
 
-# Reload Nginx Proxy Manager
-if docker ps --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
-    echo "Reloading $CONTAINER_NAME..."
+echo "Verifying container: $CONTAINER_NAME"
+
+# Check if container exists and is running
+if docker ps --format '{{.Names}}' | grep -Aw "$CONTAINER_NAME"; then
+    echo "Reloading Nginx in $CONTAINER_NAME..."
     docker exec "$CONTAINER_NAME" nginx -s reload
-    echo "✅ All snippets updated and Nginx reloaded."
+    echo "✅ Success: Reloaded."
 else
-    echo "⚠️ Warning: Container '$CONTAINER_NAME' is not running. Reload skipped."
+    echo "❌ Error: Container '$CONTAINER_NAME' not found among active containers:"
+    docker ps --format '{{.Names}}'
 fi
