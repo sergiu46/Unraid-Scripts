@@ -1,13 +1,13 @@
 ##########################################################################
-# CLOUDFLARE DDNS
+# NginX Snippets Sync Logic
 # 
 # HOW TO USE:
-# Create a new "User Script" in Unraid and paste the code below.
-# Fill variables with desired values.
+# 1. Create a new "User Script" in Unraid.
+# 2. Copy the block below and paste it into the script editor.
+# 3. Adjust variables (CONTAINER_NAME, SNIPPETS_DIR) if needed.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
-
-
+#
 # #!/bin/bash
 #
 # # --- SETTINGS ---
@@ -25,8 +25,29 @@
 # mkdir -p "$SCRIPT_DIR"
 # curl -s -fL "$SCRIPT_URL" -o "$SCRIPT_DIR/NginX-Snippets.sh" || { echo "❌ Logic Download Failed"; exit 1; }
 # source "$SCRIPT_DIR/NginX-Snippets.sh"
-
-
+#
+# --- END COPY ---
+#
+# NPM GUI CONFIGURATION:
+# In the "Advanced" tab of your Proxy Host, use the following:
+#
+# Standard Host (No Authelia):
+#
+# location / {
+#     include /data/nginx/snippets/proxy.conf;
+#     proxy_pass $forward_scheme://$server:$port;
+# }
+#
+# Host with Authelia Protection:
+#
+# include /data/nginx/snippets/authelia-location.conf;
+#
+# location / {
+#     include /data/nginx/snippets/proxy.conf;
+#     include /data/nginx/snippets/authelia-authrequest.conf;    
+#     proxy_pass $forward_scheme://$server:$port;
+# }
+#
 #########################################################################
 
 #!/bin/bash
