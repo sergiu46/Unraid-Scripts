@@ -283,4 +283,6 @@ echo ""
 echo "🚀 ZFS Backup Finished at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
-unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+
+# Notification
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE" "$SHORT_MSG"
