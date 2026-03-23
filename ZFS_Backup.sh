@@ -62,12 +62,9 @@ SUMMARY_LOG=""
 # FUNCTIONS
 
 unraid_notify() {
-    local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"
+    local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"; local web_msg="$5"
     
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # SHORT VERSION for WebUI (prevents cutoff/quotes)
-        local web_msg="Backup Complete. See logs for details."
-        
         /usr/local/emhttp/webGui/scripts/notify \
             -i "$severity" \
             -s "$bubble $title_msg" \
@@ -263,13 +260,19 @@ done
 
 # FINAL REPORT
 NOTIFY_TITLE="ZFS Backup Report"
-NOTIFY_SEVERITY="normal"; NOTIFY_BUBBLE="🟢"
+NOTIFY_SEVERITY="normal"
+NOTIFY_BUBBLE="🟢"
+SHORT_MSG="Backups completed successfully!"
 
 if [ "$FAILURE_TOTAL" -gt 0 ]; then
     if [ "$SUCCESS_TOTAL" -gt 0 ]; then
-        NOTIFY_SEVERITY="warning"; NOTIFY_BUBBLE="🟡"
+        NOTIFY_SEVERITY="warning"
+        NOTIFY_BUBBLE="🟡"
+        SHORT_MSG="Some datasets failed to sync!"
     else
-        NOTIFY_SEVERITY="alert"; NOTIFY_BUBBLE="🔴"
+        NOTIFY_SEVERITY="alert"
+        NOTIFY_BUBBLE="🔴"
+        SHORT_MSG="All backup operations failed!"
     fi
 fi
 echo "----------------------------------------------------"
