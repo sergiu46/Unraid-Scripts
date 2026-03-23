@@ -226,8 +226,15 @@ for DS in "${DATASETS[@]}"; do
 
     # 6. Source Maintenance & Rotation
     # Logic: Rotate if (Both are disabled) OR (At least one backup succeeded)
+    if [[ $local_stat -eq 3 || $remote_stat -eq 3 ]]; then
+        ((FAILURE_TOTAL++))
+    fi
+
+    # Logic: Rotate if (Both are disabled) OR (At least one backup succeeded)
     if [[ ("$RUN_LOCAL" != "yes" && "$RUN_REMOTE" != "yes") || ($local_stat -eq 1 || $remote_stat -eq 1) ]]; then
-        ((SUCCESS_TOTAL++))
+        if [[ $local_stat -ne 3 && $remote_stat -ne 3 ]]; then
+            ((SUCCESS_TOTAL++))
+        fi
         
         # Sanoid Maintenance for Source
         SRC_RAM="$DIR/src_${SRC_DS//\//_}"
@@ -250,8 +257,7 @@ for DS in "${DATASETS[@]}"; do
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
     else
-        echo "❌ Backup enabled but failed. Skipping rotation to preserve history."
-        ((FAILURE_TOTAL++))
+        echo "❌ Backup completely failed. Skipping rotation to preserve history."
     fi
 done
 
