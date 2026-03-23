@@ -50,22 +50,17 @@ SUMMARY_LOG=""
 
 # --- FUNCTIONS ---
 unraid_notify() {
-    local title_msg="$1"
-    local message="$2"
-    local severity="$3" 
-    local bubble="$4"
+    local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"; local web_msg="$5"
     
+    # Dacă web_msg lipsește, folosim titlul pentru descrierea scurtă
+    [[ -z "$web_msg" ]] && web_msg="$title_msg"
+
     if [[ "$NOTIFY_LEVEL" == "all" || "$severity" != "normal" ]]; then
-        # SHORT VERSION for WebUI (prevents cutoff/quotes)
-        local web_msg="Backup Complete. See logs for details."
-        
-        # FULL VERSION for Telegram/Email agents
-        # Uses the -m flag for the long multi-line report
         /usr/local/emhttp/webGui/scripts/notify \
             -i "$severity" \
             -s "$bubble $title_msg" \
             -d "$web_msg" \
-            -m "$(printf "%b" "$message")"
+            -m "$message"
     fi
 }
 
@@ -75,11 +70,12 @@ echo ""
 echo "🛠️ Rsync Backup Started at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 echo "----------------------------------------------------"
+
 # 1. Verification Handshake
 echo "🌐 Connecting to $REMOTE_HOST and verifying destination..."
 if ! ssh -o ConnectTimeout=5 -o BatchMode=yes "$REMOTE_USER@$REMOTE_HOST" "[ -d '$REMOTE_BASE_DIR' ]"; then
     echo "❌ Connection failed or Remote Directory '$REMOTE_BASE_DIR' missing."
-    unraid_notify "Backup Aborted" "Cannot reach $REMOTE_HOST or destination path is missing." "alert" "🔴"
+    unraid_notify "Rsync Backup Failed!" "\nCannot reach $REMOTE_HOST or destination path is missing." "alert" "🔴" "Remote host unreachable."
     exit 1
 fi
 echo "✅ Remote path verified."
@@ -92,8 +88,7 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     
     if [ ! -d "$FOLDER" ]; then
         echo "⚠️  Skipping: $FOLDER (Local path not found)"
-        # Style matching ZFS script
-        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ⏭️  Not Found\n"
+        SUMMARY_LOG+="\n📂 $FOLDER_NAME\n↳ ⏭️ Not Found\n"
         ((FAILURE_TOTAL++))
         continue
     fi
@@ -121,12 +116,17 @@ done
 NOTIFY_TITLE="Rsync Backup Report"
 NOTIFY_SEVERITY="normal"
 NOTIFY_BUBBLE="🟢"
+SHORT_MSG="All rsync backups completed successfully."
 
 if [ "$FAILURE_TOTAL" -gt 0 ]; then
     if [ "$SUCCESS_TOTAL" -gt 0 ]; then
-        NOTIFY_SEVERITY="warning"; NOTIFY_BUBBLE="🟡"
+        NOTIFY_SEVERITY="warning"
+        NOTIFY_BUBBLE="🟡"
+        SHORT_MSG="Some rsync folders backup failed."
     else
-        NOTIFY_SEVERITY="alert"; NOTIFY_BUBBLE="🔴"
+        NOTIFY_SEVERITY="alert"
+        NOTIFY_BUBBLE="🔴"
+        SHORT_MSG="All rsync operations failed."
     fi
 fi
 
