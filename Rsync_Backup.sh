@@ -141,4 +141,4 @@ echo ""
 echo "----------------------------------------------------"
 
 # Final Notification Trigger
-unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE"
+unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE" "$SHORT_MSG"
