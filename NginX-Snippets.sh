@@ -56,7 +56,10 @@
 MAX_NET_RETRIES=15
 NET_RETRY_COUNT=0
 NET_WAIT_SECONDS=10
-CHECK_HOST="8.8.8.8"
+CHECK_HOST="1.1.1.1"
+
+echo "🔄 Update NginX snippets."
+echo ""
 
 echo "Checking internet connectivity..."
 while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
@@ -160,3 +163,5 @@ else
     rm -rf "$NEW_TEMP"
     exit 1
 fi
+
+echo ""
