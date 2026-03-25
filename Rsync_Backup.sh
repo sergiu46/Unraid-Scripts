@@ -48,6 +48,13 @@ SUCCESS_TOTAL=0
 FAILURE_TOTAL=0
 SUMMARY_LOG=""
 
+# Clean Logs
+SCRIPT_NAME=$(basename "$(dirname "$0")")
+LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
+if [ "$DEBUG" != "true" ]; then
+    : > "$LOG_FILE"
+fi
+
 # --- FUNCTIONS ---
 unraid_notify() {
     local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"; local web_msg="$5"
