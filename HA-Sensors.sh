@@ -115,4 +115,21 @@ do
     drive_temp_state "${device_id}"
 done
 
-echo ""
+# Cap log size.
+MAX_LOG_LINES=${MAX_LOG_LINES:-1000}
+SCRIPT_NAME=$(basename "$(dirname "$0")")
+LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
+
+if [ -f "$LOG_FILE" ]; then
+    CURRENT_LINES=$(wc -l < "$LOG_FILE")
+    if [ "$CURRENT_LINES" -gt "$MAX_LOG_LINES" ]; then
+        # Capture the last X lines
+        tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "$LOG_FILE.tmp"
+        # Overwrite the log file using cat to preserve the file descriptor
+        cat "$LOG_FILE.tmp" > "$LOG_FILE"
+        rm "$LOG_FILE.tmp"
+        echo ""
+        echo "✂️ Log capped to $MAX_LOG_LINES lines." >> "$LOG_FILE"
+        echo ""
+    fi
+fi
