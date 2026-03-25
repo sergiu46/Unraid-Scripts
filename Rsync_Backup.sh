@@ -51,7 +51,7 @@ SUMMARY_LOG=""
 # Clean Logs
 SCRIPT_NAME=$(basename "$(dirname "$0")")
 LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
-if [ "$DEBUG" != "true" ]; then
+if [ "$DEBUG" != "true" ] && [ -f "$LOG_FILE" ]; then
     : > "$LOG_FILE"
 fi
 
