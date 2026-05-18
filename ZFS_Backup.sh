@@ -24,13 +24,23 @@
 # REMOTE_USER="root"
 # REMOTE_HOST="192.168.1.50"
 #
-# # Sanoid Retention Policy
+# # ---------------------------------------------------------
+# # Sanoid Retention Policy (Default for both Local and Remote)
 # KEEP_MANUAL="2"
 # KEEP_HOURLY="0"
 # KEEP_DAILY="3"
 # KEEP_WEEKLY="0"
 # KEEP_MONTHLY="0"
 # KEEP_YEARLY="0"
+#
+# # Optional: Override retention for LOCAL only (Uncomment to use)
+# # KEEP_LOCAL_MANUAL="2"
+# # KEEP_LOCAL_DAILY="5"
+#
+# # Optional: Override retention for REMOTE only (Uncomment to use)
+# # KEEP_REMOTE_DAILY="7"
+# # KEEP_REMOTE_WEEKLY="4"
+# # ---------------------------------------------------------
 #
 # # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
 # DEBUG="false"
@@ -88,7 +98,24 @@ contains_element() {
 }
 
 create_sanoid_config() {
-    local target_path="$1"; local config_dir="$2"
+    local target_path="$1"; local config_dir="$2"; local prefix="$3"
+    
+    # Fallback Logic: Try Specific (e.g. KEEP_LOCAL_DAILY) -> Generic (KEEP_DAILY) -> Default (0)
+    local spec_h="KEEP_${prefix}_HOURLY"; local gen_h="KEEP_HOURLY"
+    local h="${!spec_h}"; [[ -z "$h" ]] && h="${!gen_h}"; h="${h:-0}"
+
+    local spec_d="KEEP_${prefix}_DAILY"; local gen_d="KEEP_DAILY"
+    local d="${!spec_d}"; [[ -z "$d" ]] && d="${!gen_d}"; d="${d:-0}"
+
+    local spec_w="KEEP_${prefix}_WEEKLY"; local gen_w="KEEP_WEEKLY"
+    local w="${!spec_w}"; [[ -z "$w" ]] && w="${!gen_w}"; w="${w:-0}"
+
+    local spec_m="KEEP_${prefix}_MONTHLY"; local gen_m="KEEP_MONTHLY"
+    local m="${!spec_m}"; [[ -z "$m" ]] && m="${!gen_m}"; m="${m:-0}"
+
+    local spec_y="KEEP_${prefix}_YEARLY"; local gen_y="KEEP_YEARLY"
+    local y="${!spec_y}"; [[ -z "$y" ]] && y="${!gen_y}"; y="${y:-0}"
+
     mkdir -p "$config_dir"
     cp /etc/sanoid/sanoid.defaults.conf "$config_dir/sanoid.defaults.conf"
     cat <<EOF > "$config_dir/sanoid.conf"
@@ -97,11 +124,11 @@ create_sanoid_config() {
     recursive = yes
 
 [template_production]
-    hourly = ${KEEP_HOURLY:-0}
-    daily = ${KEEP_DAILY:-0}
-    weekly = ${KEEP_WEEKLY:-0}
-    monthly = ${KEEP_MONTHLY:-0}
-    yearly = ${KEEP_YEARLY:-0}
+    hourly = $h
+    daily = $d
+    weekly = $w
+    monthly = $m
+    yearly = $y
     autosnap = yes
     autoprune = yes
 EOF
@@ -163,7 +190,7 @@ for DS in "${DATASETS[@]}"; do
                 echo ""
                 local_stat=1
                 DST_RAM_LOCAL="$DIR/dst_local_${DS//\//_}"
-                create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL"
+                create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL" "LOCAL"
                 /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
                 rm -rf "$DST_RAM_LOCAL"
             else
@@ -195,7 +222,7 @@ for DS in "${DATASETS[@]}"; do
                 REMOTE_SANOID_TEMP="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
 
                 # Generate config locally first
-                create_sanoid_config "$REMOTE_DS" "$LOCAL_SANOID_TEMP"
+                create_sanoid_config "$REMOTE_DS" "$LOCAL_SANOID_TEMP" "REMOTE"
                 
                 # Push to unique remote path and prune
                 ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_SANOID_TEMP"
@@ -230,36 +257,41 @@ for DS in "${DATASETS[@]}"; do
     SUMMARY_LOG+="\n📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
 
     # 6. Source Maintenance & Rotation
-    # Logic: Rotate if (Both are disabled) OR (At least one backup succeeded)
     if [[ $local_stat -eq 3 || $remote_stat -eq 3 ]]; then
         ((FAILURE_TOTAL++))
     fi
 
-    # Logic: Rotate if (Both are disabled) OR (At least one backup succeeded)
     if [[ ("$RUN_LOCAL" != "yes" && "$RUN_REMOTE" != "yes") || ($local_stat -eq 1 || $remote_stat -eq 1) ]]; then
         if [[ $local_stat -ne 3 && $remote_stat -ne 3 ]]; then
             ((SUCCESS_TOTAL++))
         fi
         
-        # Sanoid Maintenance for Source
+        # Calculate Manual Retention Fallbacks
+        SPEC_LM="KEEP_LOCAL_MANUAL"; GEN_M="KEEP_MANUAL"
+        VAL_LM="${!SPEC_LM}"; [[ -z "$VAL_LM" ]] && VAL_LM="${!GEN_M}"; VAL_LM="${VAL_LM:-2}"
+
+        SPEC_RM="KEEP_REMOTE_MANUAL"
+        VAL_RM="${!SPEC_RM}"; [[ -z "$VAL_RM" ]] && VAL_RM="${!GEN_M}"; VAL_RM="${VAL_RM:-2}"
+
+        # Sanoid Maintenance for Source (Uses Local rules as baseline)
         SRC_RAM="$DIR/src_${SRC_DS//\//_}"
-        create_sanoid_config "$SRC_DS" "$SRC_RAM"
+        create_sanoid_config "$SRC_DS" "$SRC_RAM" "LOCAL"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
         
         echo "🧹 Pruning manual snapshots locally..."
 
-        # Always rotate Source
-        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        # Always rotate Source using Local/Generic settings
+        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         
-        # Rotate Local destination (only if successful)
+        # Rotate Local destination
         if [[ $local_stat -eq 1 ]]; then
-            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         fi
 
-        # Rotate Remote destination (only if successful)
+        # Rotate Remote destination
         if [[ $remote_stat -eq 1 ]]; then
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((KEEP_MANUAL + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
+            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((VAL_RM + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
     else
         echo "❌ Backup completely failed. Skipping rotation to preserve history."
