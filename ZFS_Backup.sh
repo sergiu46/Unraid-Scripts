@@ -25,7 +25,7 @@
 # REMOTE_HOST="192.168.1.50"
 #
 # # ---------------------------------------------------------
-# # Sanoid Retention Policy (Default for both Local and Remote)
+# # Sanoid Retention Policy Defaults
 # KEEP_MANUAL="2"
 # KEEP_HOURLY="0"
 # KEEP_DAILY="3"
@@ -33,13 +33,17 @@
 # KEEP_MONTHLY="0"
 # KEEP_YEARLY="0"
 #
-# # Optional: Override retention for LOCAL only (Uncomment to use)
-# # KEEP_LOCAL_MANUAL="2"
-# # KEEP_LOCAL_DAILY="5"
+# # # ORIGINAL ZFS SOURCE Retention Rules (optional)
+# # KEEP_SOURCE_MANUAL="1"
+# # KEEP_SOURCE_DAILY="1"
 #
-# # Optional: Override retention for REMOTE only (Uncomment to use)
-# # KEEP_REMOTE_DAILY="7"
-# # KEEP_REMOTE_WEEKLY="4"
+# # # LOCAL BACKUP Retention Rules (optional)
+# # KEEP_LOCAL_MANUAL="3"
+# # KEEP_LOCAL_DAILY="3"
+#
+# # # REMOTE BACKUP Retention Rules (optional)
+# # KEEP_REMOTE_MANUAL="3"
+# # KEEP_REMOTE_DAILY="3"
 # # ---------------------------------------------------------
 #
 # # Script config. DEBUG "true" or "false". NOTIFY_LEVEL "all" or "error"
@@ -100,7 +104,7 @@ contains_element() {
 create_sanoid_config() {
     local target_path="$1"; local config_dir="$2"; local prefix="$3"
     
-    # Fallback Logic: Try Specific (e.g. KEEP_LOCAL_DAILY) -> Generic (KEEP_DAILY) -> Default (0)
+    # Fallback Logic: Try Specific (e.g. KEEP_SOURCE_DAILY) -> Generic (KEEP_DAILY) -> Default (0)
     local spec_h="KEEP_${prefix}_HOURLY"; local gen_h="KEEP_HOURLY"
     local h="${!spec_h}"; [[ -z "$h" ]] && h="${!gen_h}"; h="${h:-0}"
 
@@ -266,30 +270,35 @@ for DS in "${DATASETS[@]}"; do
             ((SUCCESS_TOTAL++))
         fi
         
-        # Calculate Manual Retention Fallbacks
-        SPEC_LM="KEEP_LOCAL_MANUAL"; GEN_M="KEEP_MANUAL"
+        # Calculate Manual Retention Fallbacks for all three locations independently
+        GEN_M="KEEP_MANUAL"
+        
+        SPEC_SM="KEEP_SOURCE_MANUAL"
+        VAL_SM="${!SPEC_SM}"; [[ -z "$VAL_SM" ]] && VAL_SM="${!GEN_M}"; VAL_SM="${VAL_SM:-2}"
+
+        SPEC_LM="KEEP_LOCAL_MANUAL"
         VAL_LM="${!SPEC_LM}"; [[ -z "$VAL_LM" ]] && VAL_LM="${!GEN_M}"; VAL_LM="${VAL_LM:-2}"
 
         SPEC_RM="KEEP_REMOTE_MANUAL"
         VAL_RM="${!SPEC_RM}"; [[ -z "$VAL_RM" ]] && VAL_RM="${!GEN_M}"; VAL_RM="${VAL_RM:-2}"
 
-        # Sanoid Maintenance for Source (Uses Local rules as baseline)
+        # Sanoid Maintenance for Source (Now cleanly decoupled using SOURCE rules)
         SRC_RAM="$DIR/src_${SRC_DS//\//_}"
-        create_sanoid_config "$SRC_DS" "$SRC_RAM" "LOCAL"
+        create_sanoid_config "$SRC_DS" "$SRC_RAM" "SOURCE"
         /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
         rm -rf "$SRC_RAM"
         
         echo "🧹 Pruning manual snapshots locally..."
 
-        # Always rotate Source using Local/Generic settings
-        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+        # Always rotate Source using SOURCE settings
+        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_SM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         
-        # Rotate Local destination
+        # Rotate Local destination using LOCAL settings
         if [[ $local_stat -eq 1 ]]; then
             zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
         fi
 
-        # Rotate Remote destination
+        # Rotate Remote destination using REMOTE settings
         if [[ $remote_stat -eq 1 ]]; then
             ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((VAL_RM + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
         fi
