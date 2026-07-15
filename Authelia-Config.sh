@@ -188,14 +188,14 @@ fi
 # SET PERMISSIONS
 echo "Setting file permissions for $CONFIG_DIR..."
 
-# Set Ownership
 chown -R 99:100 "$CONFIG_DIR"
-# Set Directory permissions (755: Allows container to read/enter directories)
 find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
-# Set standard File permissions (644: Readable by the app, but not writable by others)
-find "$CONFIG_DIR" -type f -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -exec chmod 644 {} \;
-# Strictly lock down sensitive files (600: Only the owner can read/write
-find "$CONFIG_DIR" -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*secret*" \) -exec chmod 600 {} \;
+
+# Set standard files to 644 (Excludes any folder containing 'secret' and sensitive extensions)
+find "$CONFIG_DIR" -type f -not -path "*/secret*/*" -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -not -name "*.key" -not -name "*_key" -exec chmod 644 {} \;
+
+# Set sensitive files to 600 (Includes any folder containing 'secret' and sensitive extensions)
+find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "*.key" -o -name "*_key" \) -exec chmod 600 {} \;
 
 echo ""
 
