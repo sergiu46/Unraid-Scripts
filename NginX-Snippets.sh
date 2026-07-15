@@ -190,4 +190,13 @@ else
     exit 1
 fi
 
+# ET PERMISSIONS
+echo "Setting file permissions..."
+# Set directory permissions
+find "$SNIPPETS_DIR" -type d -exec chmod 755 {} \;
+# Set file permissions
+find "$SNIPPETS_DIR" -type f -exec chmod 644 {} \;
+# Set ownership to root
+chown -R root:root "$SNIPPETS_DIR"
+
 echo ""
