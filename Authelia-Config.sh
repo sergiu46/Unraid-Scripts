@@ -186,15 +186,16 @@ else
 fi
 
 # SET PERMISSIONS
-echo "Setting file permissions..."
-# Set Ownership to the container's user
-chown -R 99:100 /mnt/user/appdata/authelia
-# Set Directories to 755 (Allow traversal)
-find /mnt/user/appdata/authelia -type d -exec chmod 755 {} \;
-# Set standard files to 644
-find /mnt/user/appdata/authelia -type f -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -exec chmod 644 {} \;
-# Strictly lock down sensitive files (Secrets and Databases)
-find /mnt/user/appdata/authelia -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "users_database.yml" \) -exec chmod 600 {} \;
+echo "Setting file permissions for $CONFIG_DIR..."
+
+# Set Ownership
+chown -R 99:100 "$CONFIG_DIR"
+# Set Directory permissions (755: Allows container to read/enter directories)
+find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
+# Set standard File permissions (644: Readable by the app, but not writable by others)
+find "$CONFIG_DIR" -type f -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -exec chmod 644 {} \;
+# Strictly lock down sensitive files (600: Only the owner can read/write
+find "$CONFIG_DIR" -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*secret*" \) -exec chmod 600 {} \;
 
 echo ""
 
