@@ -1,0 +1,31 @@
+---
+######################################################################################################
+#                                          Users Database                                            #
+#                                                                                                    #
+# Use command below to generate password hash:                                                       #
+#                                                                                                    #
+# docker run authelia/authelia:latest authelia crypto hash generate argon2 --password 'YourPassword' #
+######################################################################################################
+
+# This file can be used if you do not have an LDAP set up.
+
+# List of users
+users:
+  user1:
+    displayname: "User 1"
+    password: "Generated Password hash" 
+    email: user1@email.com
+    groups:
+      - admins
+      - dev
+
+  user2:
+    displayname: "User 2"
+    password: "Generated Password hash" 
+    email: user2@email.com
+    groups:
+      - admins
+      - dev
+
+
+...
