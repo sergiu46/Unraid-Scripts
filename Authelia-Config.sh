@@ -167,6 +167,15 @@ fi
 # Swap files to production (Safely overwrites only incoming files to protect untracked files)
 cp -rp "$NEW_TEMP/." "$CONFIG_DIR/"
 
+# SET PERMISSIONS
+echo "Setting file permissions for $CONFIG_DIR..."
+chown -R 99:100 "$CONFIG_DIR"
+find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
+# Set standard files to 644 (Excludes any folder containing 'secret' and sensitive extensions)
+find "$CONFIG_DIR" -type f -not -path "*/secret*/*" -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -not -name "*.key" -not -name "*_key" -exec chmod 644 {} \;
+# Set sensitive files to 600 (Includes any folder containing 'secret' and sensitive extensions)
+find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "*.key" -o -name "*_key" \) -exec chmod 400 {} \;
+
 # TEST & RESTART
 echo "Testing Authelia configuration..."
 if docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config > /dev/null 2>&1; then
@@ -184,18 +193,6 @@ else
     rm -rf "$NEW_TEMP"
     exit 1
 fi
-
-# SET PERMISSIONS
-echo "Setting file permissions for $CONFIG_DIR..."
-
-chown -R 99:100 "$CONFIG_DIR"
-find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
-
-# Set standard files to 644 (Excludes any folder containing 'secret' and sensitive extensions)
-find "$CONFIG_DIR" -type f -not -path "*/secret*/*" -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -not -name "*.key" -not -name "*_key" -exec chmod 644 {} \;
-
-# Set sensitive files to 600 (Includes any folder containing 'secret' and sensitive extensions)
-find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "*.key" -o -name "*_key" \) -exec chmod 400 {} \;
 
 echo ""
 
