@@ -195,7 +195,7 @@ find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
 find "$CONFIG_DIR" -type f -not -path "*/secret*/*" -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -not -name "*.key" -not -name "*_key" -exec chmod 644 {} \;
 
 # Set sensitive files to 600 (Includes any folder containing 'secret' and sensitive extensions)
-find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "*.key" -o -name "*_key" \) -exec chmod 600 {} \;
+find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "*.key" -o -name "*_key" \) -exec chmod 400 {} \;
 
 echo ""
 
