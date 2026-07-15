@@ -28,29 +28,16 @@
 #
 # --- END COPY ---
 #
-# NPM GUI CONFIGURATION:
-# In the "Advanced" tab of your Proxy Host, use the following:
-#
-# Standard Host (No Authelia):
-#
-# location / {
-#     include /data/nginx/snippets/proxy.conf;
-#     proxy_pass $forward_scheme://$server:$port;
-# }
-#
-# Host with Authelia Protection:
-#
-# include /data/nginx/snippets/authelia-location.conf;
-#
-# location / {
-#     include /data/nginx/snippets/proxy.conf;
-#     include /data/nginx/snippets/authelia-authrequest.conf;    
-#     proxy_pass $forward_scheme://$server:$port;
-# }
-#
 #########################################################################
 
 #!/bin/bash
+
+# --- 1. WAIT FOR DOCKER SOCKET ---
+echo "Waiting for Docker daemon..."
+until [ -S /var/run/docker.sock ]; do
+    sleep 1
+done
+echo "✅ Docker daemon is ready."
 
 # WAIT FOR INTERNET 
 MAX_NET_RETRIES=15
@@ -60,13 +47,6 @@ CHECK_HOST="1.1.1.1"
 
 echo "🔄 Update NginX snippets."
 echo ""
-
-# --- WAIT FOR DOCKER SOCKET ---
-echo "Waiting for Docker daemon..."
-until [ -S /var/run/docker.sock ]; do
-    sleep 1
-done
-echo "✅ Docker daemon is ready."
 
 echo "Checking internet connectivity..."
 while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
@@ -81,14 +61,12 @@ while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
 done
 echo "✅ Internet connection established."
 
-
 # Unraid Notification
 send_notification() {
     local subject=$1
     local message=$2
     local importance=$3 # "normal" or "alert"
 
-    # Logic: Always send alerts. Only send normal/success if DEBUG is true.
     if [[ "$importance" == "alert" ]] || [[ "$DEBUG" == "true" ]]; then
         /usr/local/emhttp/webGui/scripts/notify -e "NPM Snippet Sync" -s "$subject" -d "$message" -i "$importance"
     fi
@@ -122,23 +100,24 @@ while ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; do
 done
 echo "✅ $CONTAINER_NAME is online."
 
-# WAIT FOR NGINX TO INITIALIZE INSIDE CONTAINER
-INIT_MAX_RETRIES=12
+# WAIT FOR NGINX DAEMON ACTIVE PROCESS
+INIT_MAX_RETRIES=15
 INIT_RETRY_COUNT=0
 INIT_WAIT_SECONDS=5
 
-echo "Waiting for Nginx to initialize inside $CONTAINER_NAME..."
-while ! docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; do
+echo "Waiting for Nginx daemon to fully start inside $CONTAINER_NAME..."
+# Checks if PID file exists, is not empty, and the referenced process PID is actively running
+while ! docker exec "$CONTAINER_NAME" sh -c 'PID=$(cat /run/nginx/nginx.pid 2>/dev/null); [ -n "$PID" ] && kill -0 "$PID" 2>/dev/null'; do
     INIT_RETRY_COUNT=$((INIT_RETRY_COUNT + 1))
     if [ $INIT_RETRY_COUNT -ge $INIT_MAX_RETRIES ]; then
-        echo "❌ Error: Nginx failed to initialize within $((INIT_MAX_RETRIES * INIT_WAIT_SECONDS))s. Aborting."
-        send_notification "Sync Aborted" "Nginx process inside $CONTAINER_NAME failed to initialize in time." "alert"
+        echo "❌ Error: Nginx daemon failed to start within $((INIT_MAX_RETRIES * INIT_WAIT_SECONDS))s. Aborting."
+        send_notification "Sync Aborted" "Nginx daemon inside $CONTAINER_NAME failed to start in time." "alert"
         exit 1
     fi
-    echo "Waiting for internal Nginx readiness (Attempt $INIT_RETRY_COUNT/$INIT_MAX_RETRIES)..."
+    echo "Waiting for active Nginx PID (Attempt $INIT_RETRY_COUNT/$INIT_MAX_RETRIES)..."
     sleep $INIT_WAIT_SECONDS
 done
-echo "✅ Nginx is fully initialized. Proceeding with sync."
+echo "✅ Nginx daemon is active. Proceeding with sync."
 
 # BACKUP
 if [ -d "$SNIPPETS_DIR" ]; then
@@ -150,7 +129,7 @@ fi
 
 mkdir -p "$SNIPPETS_DIR"
 
-# --- STEP 2: FETCH FILE LIST ---
+# DOWNLOAD & SYNC
 FILE_LIST=$(curl -s "$API_URL")
 if echo "$FILE_LIST" | grep -q '"message": "Not Found"'; then
     echo "❌ Error: GitHub folder not found."
@@ -158,7 +137,6 @@ if echo "$FILE_LIST" | grep -q '"message": "Not Found"'; then
     exit 1
 fi
 
-# DOWNLOAD & SYNC
 rm -rf "$NEW_TEMP" && mkdir -p "$NEW_TEMP"
 
 echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while read -r NAME; read -r RAW_URL; do
@@ -168,35 +146,30 @@ echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while
     fi
 done
 
-# Swap files to production
+# Swap files
 rm -rf "$SNIPPETS_DIR"/*
 cp -rp "$NEW_TEMP/." "$SNIPPETS_DIR/"
+
+# --- SET PERMISSIONS ---
+echo "Setting file permissions..."
+find "$SNIPPETS_DIR" -type d -exec chmod 755 {} \;
+find "$SNIPPETS_DIR" -type f -exec chmod 644 {} \;
+chown -R root:root "$SNIPPETS_DIR"
 
 # TEST & RELOAD
 echo "Testing Nginx configuration..."
 if docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; then
     echo "✅ Config valid. Reloading..."
-    sleep 2
     docker exec "$CONTAINER_NAME" nginx -s reload
     send_notification "Sync Successful" "Snippets updated and $CONTAINER_NAME reloaded." "normal"
     rm -rf "$BACKUP_DIR" "$NEW_TEMP"
 else
     echo "❌ ERROR: New config INVALID. Rolling back..."
     send_notification "Update Failed - Rolling Back" "Invalid syntax in GitHub snippets. Reverted to backup." "alert"
-    
     rm -rf "$SNIPPETS_DIR"/*
     [ -d "$BACKUP_DIR" ] && cp -rp "$BACKUP_DIR/." "$SNIPPETS_DIR/"
     rm -rf "$NEW_TEMP"
     exit 1
 fi
-
-# ET PERMISSIONS
-echo "Setting file permissions..."
-# Set directory permissions
-find "$SNIPPETS_DIR" -type d -exec chmod 755 {} \;
-# Set file permissions
-find "$SNIPPETS_DIR" -type f -exec chmod 644 {} \;
-# Set ownership to root
-chown -R root:root "$SNIPPETS_DIR"
 
 echo ""
