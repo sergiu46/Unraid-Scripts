@@ -113,7 +113,25 @@ while ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; do
     echo "Waiting for $CONTAINER_NAME to start (Attempt $RETRY_COUNT/$MAX_RETRIES)..."
     sleep $WAIT_SECONDS
 done
-echo "✅ $CONTAINER_NAME is online. Proceeding with sync."
+echo "✅ $CONTAINER_NAME is online."
+
+# WAIT FOR NGINX TO INITIALIZE INSIDE CONTAINER
+INIT_MAX_RETRIES=12
+INIT_RETRY_COUNT=0
+INIT_WAIT_SECONDS=5
+
+echo "Waiting for Nginx to initialize inside $CONTAINER_NAME..."
+while ! docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; do
+    INIT_RETRY_COUNT=$((INIT_RETRY_COUNT + 1))
+    if [ $INIT_RETRY_COUNT -ge $INIT_MAX_RETRIES ]; then
+        echo "❌ Error: Nginx failed to initialize within $((INIT_MAX_RETRIES * INIT_WAIT_SECONDS))s. Aborting."
+        send_notification "Sync Aborted" "Nginx process inside $CONTAINER_NAME failed to initialize in time." "alert"
+        exit 1
+    fi
+    echo "Waiting for internal Nginx readiness (Attempt $INIT_RETRY_COUNT/$INIT_MAX_RETRIES)..."
+    sleep $INIT_WAIT_SECONDS
+done
+echo "✅ Nginx is fully initialized. Proceeding with sync."
 
 # BACKUP
 if [ -d "$SNIPPETS_DIR" ]; then
