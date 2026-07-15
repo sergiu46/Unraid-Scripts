@@ -3,7 +3,9 @@
 #                   Authelia configuration                    #
 #                                                             #
 # Use the command below for generating secrets                #
-# openssl rand -base64 32                                     #
+# openssl rand -base64 32                                     #  
+# Use this command for generating oidc key                    #
+# openssl genrsa -out rsa.2048.key 2048                       #
 ###############################################################
 
 theme: dark
