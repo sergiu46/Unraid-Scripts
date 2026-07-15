@@ -1,0 +1,202 @@
+---
+###############################################################
+#                   Authelia configuration                    #
+#                                                             #
+# Use the command below for generating secrets                #
+# openssl rand -base64 32                                     #
+###############################################################
+
+theme: dark
+identity_validation:
+  reset_password:
+    jwt_secret: '{{ secret "/config/secrets/jwt_secret" | trim }}'
+
+
+server:
+  address: '{{ secret "/config/secrets/server_adress" | trim }}'
+  buffers:
+    read: 4096
+    write: 4096
+  endpoints:
+    enable_pprof: false
+    enable_expvars: false
+  disable_healthcheck: false
+
+
+log:
+  level: info
+  
+totp:
+  issuer: '{{ secret "/config/secrets/domain" | trim }}'
+  period: 30
+  skew: 1
+
+
+authentication_backend:
+  password_reset:
+    disable: false
+  refresh_interval: 5m
+  file:
+    path: /config/users_database.yml
+    password:
+      algorithm: argon2id
+      iterations: 1
+      salt_length: 16
+      parallelism: 8
+      memory: 64
+      
+access_control:
+  default_policy: deny
+  rules:
+    # authelia
+    - domain: 
+        - 'auth.{{ secret "/config/secrets/domain" | trim }}'
+      policy: bypass
+
+    # VueTorrent
+    - domain:
+        - 'vuetorrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
+      resources:
+        - "^/api([/?].*)?$"
+        - "^/identity.*$"
+        - "^/triggers.*$"
+        - "^/meshagents.*$"
+        - "^/meshsettings.*$"
+        - "^/agent.*$"
+        - "^/control.*$"
+        - "^/meshrelay.*$"
+        - "^/wl.*$"
+        - "^/plugins.*$"
+        - "^/logging.*$"
+      policy: bypass
+
+    # Filbrowser share bypass
+    - domain:
+        - 'files.{{ secret "/config/secrets/domain" | trim }}'
+      resources:
+          - "^/api/public/dl/.*"
+          - "^/share/.*"
+          - "^/static/js/.*"
+          - "^/static/css/.*"
+          - "^/static/img/.*"
+          - "^/static/themes/.*"
+          - "^/static/fonts/.*"
+          - "^/static/assets/.*"
+      policy: bypass
+    
+    # VaultWarden  
+    - domain: 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+      policy: deny
+      resources:
+        - "^/admin.*$"
+    - domain:
+        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+      policy: bypass
+
+    # catch-all
+    - domain:
+        - '*.{{ secret "/config/secrets/domain" | trim }}'
+      policy: two_factor
+      
+      
+session:
+  name: authelia_session
+  same_site: lax
+  secret: '{{ secret "/config/secrets/session_secret" | trim }}'
+  expiration: 1h
+  inactivity: 5m
+  remember_me: 2M
+  cookies:
+    - domain: '{{ secret "/config/secrets/domain" | trim }}'
+      authelia_url: 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
+      default_redirection_url: 'https://{{ secret "/config/secrets/domain" | trim }}'
+  redis:
+    host: redis
+    port: 6379
+    timeout: '30s'
+    max_retries: 10
+    database_index: 2
+    maximum_active_connections: 10
+    minimum_idle_connections: 0
+      
+
+regulation:
+  max_retries: 3
+  find_time: 10m
+  ban_time: 12h
+
+
+storage:
+  encryption_key: '{{ secret "/config/secrets/storage_encryption_key" | trim }}'
+  local:
+    path: /config/db.sqlite3
+
+notifier:
+  disable_startup_check: false
+  filesystem:
+    filename: /config/notification.txt
+
+identity_providers:
+  oidc:
+    hmac_secret: '{{ secret "/config/secrets/oidc_hmac_secret" | trim }}'
+    jwks:
+      - key_id: 'authelia'
+        algorithm: 'RS256'
+        use: 'sig'
+        key: {{ secret "/config/secrets/rsa.2048.key" | mindent 10 "|" | msquote }}
+    enable_client_debug_messages: false
+    minimum_parameter_entropy: 8
+    enforce_pkce: 'public_clients_only'
+    enable_pkce_plain_challenge: false
+    enable_jwt_access_token_stateless_introspection: false
+    discovery_signed_response_alg: 'none'
+    discovery_signed_response_key_id: ''
+    require_pushed_authorization_requests: false
+    lifespans:
+      access_token: '1h'
+      authorize_code: '1m'
+      id_token: '1h'
+      refresh_token: '90m'
+    cors:
+      endpoints:
+        - 'authorization'
+        - 'token'
+        - 'revocation'
+        - 'introspection'
+      allowed_origins:
+        - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
+      allowed_origins_from_client_redirect_uris: false
+    clients:
+      - client_id: immich
+        client_name: Immich OIDC
+        client_secret: '{{ secret "/config/secrets/immich_client_secret" | trim }}'
+        public: false
+        authorization_policy: two_factor
+        consent_mode: pre-configured
+        token_endpoint_auth_method: "client_secret_basic"
+        pre_configured_consent_duration: 1w
+        scopes:
+          - openid
+          - groups
+          - email
+          - profile
+        redirect_uris:
+          - 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
+          - 'https://auth.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
+          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
+          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/auth/login'
+          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
+          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
+          - 'app.immich:/'
+          - 'app.immich:///oauth-callback'
+          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
+        grant_types:
+          - authorization_code
+        response_types:
+          - code
+        response_modes:
+          - form_post
+          - query
+          - fragment       
+...
