@@ -142,12 +142,27 @@ fi
 # DOWNLOAD & SYNC
 rm -rf "$NEW_TEMP" && mkdir -p "$NEW_TEMP"
 
-echo "$FILE_LIST" | grep -oP '"name": "\K[^"]+|"download_url": "\K[^"]+' | while read -r NAME; read -r RAW_URL; do
-    if [[ "$RAW_URL" != "null" ]]; then
-        echo "Downloading: $NAME"
-        curl -sSL "$RAW_URL" -o "$NEW_TEMP/$NAME"
-    fi
-done
+# Robust JSON parser targeting only actual files
+if command -v jq &> /dev/null; then
+    echo "$FILE_LIST" | jq -r '.[] | select(.type == "file") | "\(.name) \(.download_url)"' | while read -r NAME RAW_URL; do
+        if [[ -n "$NAME" && -n "$RAW_URL" ]]; then
+            echo "Downloading: $NAME"
+            curl -sSL "$RAW_URL" -o "$NEW_TEMP/$NAME"
+        fi
+    done
+else
+    # Fallback if jq is not present on the host
+    echo "$FILE_LIST" | tr '}' '\n' | while read -r ITEM; do
+        if echo "$ITEM" | grep -q '"type": "file"'; then
+            NAME=$(echo "$ITEM" | grep -oP '"name": "\K[^"]+')
+            RAW_URL=$(echo "$ITEM" | grep -oP '"download_url": "\K[^"]+')
+            if [[ -n "$NAME" && -n "$RAW_URL" ]]; then
+                echo "Downloading: $NAME"
+                curl -sSL "$RAW_URL" -o "$NEW_TEMP/$NAME"
+            fi
+        fi
+    done
+fi
 
 # Swap files to production (Safely overwrites only incoming files to protect untracked files)
 cp -rp "$NEW_TEMP/." "$CONFIG_DIR/"
@@ -172,11 +187,15 @@ fi
 
 # SET PERMISSIONS
 echo "Setting file permissions..."
-# Set directory permissions
-find "$CONFIG_DIR" -type d -exec chmod 755 {} \;
-# Set file permissions
-find "$CONFIG_DIR" -type f -exec chmod 644 {} \;
-# Set ownership to root
-chown -R root:root "$CONFIG_DIR"
+# Set Ownership to the container's user
+chown -R 99:100 /mnt/user/appdata/authelia
+# Set Directories to 755 (Allow traversal)
+find /mnt/user/appdata/authelia -type d -exec chmod 755 {} \;
+# Set standard files to 644
+find /mnt/user/appdata/authelia -type f -not -name "*.db" -not -name "*.sqlite" -not -name "*secret*" -exec chmod 644 {} \;
+# Strictly lock down sensitive files (Secrets and Databases)
+find /mnt/user/appdata/authelia -type f \( -name "*.db" -o -name "*.sqlite" -o -name "*secret*" -o -name "users_database.yml" \) -exec chmod 600 {} \;
 
 echo ""
+
+
