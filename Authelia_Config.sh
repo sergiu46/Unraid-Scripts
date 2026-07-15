@@ -7,25 +7,25 @@
 # 3. Adjust variables (CONTAINER_NAME, CONFIG_DIR) if needed.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
-#
+
 # #!/bin/bash
 #
 # # --- SETTINGS ---
-# CONTAINER_NAME="authelia"
-# CONFIG_DIR="/mnt/user/appdata/authelia"
-# CONFIG_URL="https://github.com/sergiu46/Unraid-Scripts/tree/main/Authelia-Config"
+# CONTAINER_NAME="Authelia"
+# CONFIG_DIR="/mnt/user/appdata/Authelia"
 #
 # # Script config
 # DEBUG="false"
-# SCRIPT_DIR="/dev/shm/Authelia-Config"
-# SCRIPT_URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Authelia-Config.sh"
+# SCRIPT_DIR="/dev/shm/Authelia_Config"
+# SCRIPT_URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Authelia_Config.sh"
 #
 # # Download and execute logic
 # [[ "$DEBUG" == "true" ]] && rm -rf "$SCRIPT_DIR"
 # mkdir -p "$SCRIPT_DIR"
-# curl -s -fL "$SCRIPT_URL" -o "$SCRIPT_DIR/Authelia-Config.sh" || { echo "❌ Logic Download Failed"; exit 1; }
-# source "$SCRIPT_DIR/Authelia-Config.sh"
-#
+# curl -s -fL "$SCRIPT_URL" -o "$SCRIPT_DIR/Authelia_Config.sh" || \
+# { echo "❌ Logic Download Failed"; exit 1; }
+# source "$SCRIPT_DIR/Authelia_Config.sh"
+
 # --- END COPY ---
 #
 #########################################################################
