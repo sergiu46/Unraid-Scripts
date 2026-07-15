@@ -1,11 +1,37 @@
-#!/bin/bash
 ##########################################################################
-# DESEC.IO DDNS
+# deSEC.io DDNS
 # 
 # HOW TO USE:
 # Create a new "User Script" in Unraid and paste the code below.
 # Fill variables with desired values.
+#
+# --- COPY THIS TO UNRAID USER SCRIPTS ---
+
+
+# #!/bin/bash
+#
+# # deSEC.io setup
+# TOKEN="xxxxxxxxxxxxxxxxxxxxxxxxx"
+# DOMAIN="xxxx.dedyn.io"
+#
+# # Behavior
+# NOTIFICATION_TYPE="all"    # Options: "all", "error", "none"
+# DEBUG="false"              # Set to "true" to bypass cache and show logs
+#
+# # Download script
+# DIR="/dev/shm/deSEC.io_DDNS"
+# URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/deSEC.io_DDNS.sh"
+#
+# [[ "$DEBUG" == "true" ]] && rm -rf "$DIR"
+# mkdir -p "$DIR"
+# [[ -f "$DIR/Desec_DDNS.sh" ]] || \
+# curl -s -fL "$URL" -o "$DIR/deSEC.io_DDNS.sh" || \
+# { echo "❌ Download Failed"; exit 1; }
+# source "$DIR/deSEC.io_DDNS.sh"
+
+
 #########################################################################
+#!/bin/bash
 
 # Cache Setup (RAM Disk)
 DIR="${DIR:-/dev/shm/deSEC.io_DDNS}"
