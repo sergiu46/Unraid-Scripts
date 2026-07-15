@@ -10,7 +10,7 @@
 
 # #!/bin/bash
 #
-# # --- SETTINGS ---
+# # SETTINGS
 # CONTAINER_NAME="Authelia"
 # CONFIG_DIR="/mnt/user/appdata/Authelia"
 #
@@ -38,6 +38,8 @@ MAX_NET_RETRIES=15
 NET_RETRY_COUNT=0
 NET_WAIT_SECONDS=10
 CHECK_HOST="1.1.1.1"
+
+CONFIG_URL="https://github.com/sergiu46/Unraid-Scripts/tree/main/Authelia_Config"
 
 echo "🔄 Update Authelia configuration."
 echo ""
