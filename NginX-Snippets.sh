@@ -47,7 +47,6 @@ until [ -S /var/run/docker.sock ]; do
     sleep 1
 done
 echo "✅ Docker daemon is ready."
-echo ""
 
 echo "Checking internet connectivity..."
 while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
