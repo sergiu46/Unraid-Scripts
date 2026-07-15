@@ -61,6 +61,13 @@ CHECK_HOST="1.1.1.1"
 echo "🔄 Update NginX snippets."
 echo ""
 
+# --- WAIT FOR DOCKER SOCKET ---
+echo "Waiting for Docker daemon..."
+until [ -S /var/run/docker.sock ]; do
+    sleep 1
+done
+echo "✅ Docker daemon is ready."
+
 echo "Checking internet connectivity..."
 while ! ping -c 1 -W 2 "$CHECK_HOST" > /dev/null 2>&1; do
     NET_RETRY_COUNT=$((NET_RETRY_COUNT + 1))
@@ -169,6 +176,7 @@ cp -rp "$NEW_TEMP/." "$SNIPPETS_DIR/"
 echo "Testing Nginx configuration..."
 if docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; then
     echo "✅ Config valid. Reloading..."
+    sleep 2
     docker exec "$CONTAINER_NAME" nginx -s reload
     send_notification "Sync Successful" "Snippets updated and $CONTAINER_NAME reloaded." "normal"
     rm -rf "$BACKUP_DIR" "$NEW_TEMP"
