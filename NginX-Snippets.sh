@@ -32,13 +32,6 @@
 
 #!/bin/bash
 
-# --- 1. WAIT FOR DOCKER SOCKET ---
-echo "Waiting for Docker daemon..."
-until [ -S /var/run/docker.sock ]; do
-    sleep 1
-done
-echo "✅ Docker daemon is ready."
-
 # WAIT FOR INTERNET 
 MAX_NET_RETRIES=15
 NET_RETRY_COUNT=0
@@ -46,6 +39,14 @@ NET_WAIT_SECONDS=10
 CHECK_HOST="1.1.1.1"
 
 echo "🔄 Update NginX snippets."
+echo ""
+
+# WAIT FOR DOCKER SOCKET
+echo "Waiting for Docker daemon..."
+until [ -S /var/run/docker.sock ]; do
+    sleep 1
+done
+echo "✅ Docker daemon is ready."
 echo ""
 
 echo "Checking internet connectivity..."
