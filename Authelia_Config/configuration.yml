@@ -13,7 +13,6 @@ identity_validation:
   reset_password:
     jwt_secret: '{{ secret "/config/secrets/jwt_secret" | trim }}'
 
-
 server:
   address: '{{ secret "/config/secrets/server_adress" | trim }}'
   buffers:
@@ -24,15 +23,13 @@ server:
     enable_expvars: false
   disable_healthcheck: false
 
-
 log:
   level: info
-  
+
 totp:
   issuer: '{{ secret "/config/secrets/domain" | trim }}'
   period: 30
   skew: 1
-
 
 authentication_backend:
   password_reset:
@@ -42,11 +39,11 @@ authentication_backend:
     path: /config/users_database.yml
     password:
       algorithm: argon2id
-      iterations: 1
+      iterations: 3
       salt_length: 16
       parallelism: 8
       memory: 64
-      
+
 access_control:
   default_policy: deny
   rules:
@@ -58,6 +55,8 @@ access_control:
     # VueTorrent
     - domain:
         - 'vuetorrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'qbittorrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'torrent.{{ secret "/config/secrets/domain" | trim }}'
         - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
       resources:
         - "^/api([/?].*)?$"
@@ -76,32 +75,35 @@ access_control:
     # Filbrowser share bypass
     - domain:
         - 'files.{{ secret "/config/secrets/domain" | trim }}'
+        - 'filebrowser.{{ secret "/config/secrets/domain" | trim }}'
       resources:
-          - "^/api/public/dl/.*"
-          - "^/share/.*"
-          - "^/static/js/.*"
-          - "^/static/css/.*"
-          - "^/static/img/.*"
-          - "^/static/themes/.*"
-          - "^/static/fonts/.*"
-          - "^/static/assets/.*"
+        - "^/api/public/dl/.*"
+        - "^/share/.*"
+        - "^/static/js/.*"
+        - "^/static/css/.*"
+        - "^/static/img/.*"
+        - "^/static/themes/.*"
+        - "^/static/fonts/.*"
+        - "^/static/assets/.*"
       policy: bypass
-    
+
     # VaultWarden  
-    - domain: 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+    - domain: 
+        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
       policy: deny
       resources:
         - "^/admin.*$"
     - domain:
         - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
       policy: bypass
 
     # catch-all
     - domain:
         - '*.{{ secret "/config/secrets/domain" | trim }}'
       policy: two_factor
-      
-      
+
 session:
   name: authelia_session
   same_site: lax
@@ -121,13 +123,11 @@ session:
     database_index: 2
     maximum_active_connections: 10
     minimum_idle_connections: 0
-      
 
 regulation:
   max_retries: 3
   find_time: 10m
   ban_time: 12h
-
 
 storage:
   encryption_key: '{{ secret "/config/secrets/storage_encryption_key" | trim }}'
@@ -152,8 +152,8 @@ identity_providers:
     enforce_pkce: 'public_clients_only'
     enable_pkce_plain_challenge: false
     enable_jwt_access_token_stateless_introspection: false
-    discovery_signed_response_alg: 'none'
-    discovery_signed_response_key_id: ''
+    discovery_signed_response_alg: 'RS256'
+    discovery_signed_response_key_id: 'authelia'
     require_pushed_authorization_requests: false
     lifespans:
       access_token: '1h'
@@ -200,5 +200,6 @@ identity_providers:
         response_modes:
           - form_post
           - query
-          - fragment       
+          - fragment
+
 ...
