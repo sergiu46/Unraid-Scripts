@@ -1,11 +1,10 @@
 ---
-######################################################################################################
-#                                          Users Database                                            #
-#                                                                                                    #
-# Use command below to generate password hash:                                                       #
-#                                                                                                    #
-# docker run authelia/authelia:latest authelia crypto hash generate argon2 --password 'YourPassword' #
-######################################################################################################
+##########################################################################################################################################################################
+# Users Database                                                                                                                                                         #
+#                                                                                                                                                                        #
+# Use command below to generate password hash:                                                                                                                           #
+# docker run authelia/authelia:latest authelia crypto hash generate argon2 --iterations 3 --memory 64 --parallelism 8 --salt-length 16 --password 'YourPassword'         #
+##########################################################################################################################################################################
 
 # This file can be used if you do not have an LDAP set up.
 
