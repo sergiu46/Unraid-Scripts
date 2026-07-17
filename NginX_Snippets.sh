@@ -171,7 +171,7 @@ else
     echo "❌ ERROR: New config INVALID. Rolling back..."
     echo "--- NGINX VALIDATION LOGS ---"
     echo "$VALIDATION_OUTPUT"
-    echo "-----------------------------""
+    echo "-----------------------------"
     send_notification "Update Failed - Rolling Back" "Invalid syntax in GitHub snippets. Reverted to backup." "alert"
     rm -rf "$SNIPPETS_DIR"/*
     [ -d "$BACKUP_DIR" ] && cp -rp "$BACKUP_DIR/." "$SNIPPETS_DIR/"
