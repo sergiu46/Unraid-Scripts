@@ -113,8 +113,9 @@ webauthn:
   disable: false
   display_name: 'My Security Keys'
   attestation_conveyance_preference: 'none'
-  user_verification: 'preferred'
   timeout: 60s
+  selection_criteria:
+    user_verification: 'preferred'
 
 session:
   name: authelia_session
