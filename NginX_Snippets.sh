@@ -160,13 +160,18 @@ chown -R root:root "$SNIPPETS_DIR"
 
 # TEST & RELOAD
 echo "Testing Nginx configuration..."
-if docker exec "$CONTAINER_NAME" nginx -t > /dev/null 2>&1; then
+VALIDATION_OUTPUT=$(docker exec "$CONTAINER_NAME" nginx -t 2>&1)
+
+if [ $? -eq 0 ]; then
     echo "✅ Config valid. Reloading..."
     docker exec "$CONTAINER_NAME" nginx -s reload
     send_notification "Sync Successful" "Snippets updated and $CONTAINER_NAME reloaded." "normal"
     rm -rf "$BACKUP_DIR" "$NEW_TEMP"
 else
     echo "❌ ERROR: New config INVALID. Rolling back..."
+    echo "--- NGINX VALIDATION LOGS ---"
+    echo "$VALIDATION_OUTPUT"
+    echo "-----------------------------""
     send_notification "Update Failed - Rolling Back" "Invalid syntax in GitHub snippets. Reverted to backup." "alert"
     rm -rf "$SNIPPETS_DIR"/*
     [ -d "$BACKUP_DIR" ] && cp -rp "$BACKUP_DIR/." "$SNIPPETS_DIR/"
