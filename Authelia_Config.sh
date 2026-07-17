@@ -111,10 +111,18 @@ INIT_RETRY_COUNT=0
 INIT_WAIT_SECONDS=5
 
 echo "Waiting for Authelia to initialize inside $CONTAINER_NAME..."
-while ! docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config > /dev/null 2>&1; do
+while true; do
+    INIT_OUTPUT=$(docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config 2>&1)
+    if [ $? -eq 0 ]; then
+        break
+    fi
+    
     INIT_RETRY_COUNT=$((INIT_RETRY_COUNT + 1))
     if [ $INIT_RETRY_COUNT -ge $INIT_MAX_RETRIES ]; then
         echo "❌ Error: Authelia failed to initialize within $((INIT_MAX_RETRIES * INIT_WAIT_SECONDS))s. Aborting."
+        echo "--- INITIALIZATION VALIDATION LOGS ---"
+        echo "$INIT_OUTPUT"
+        echo "--------------------------------------"
         send_notification "Sync Aborted" "Authelia process inside $CONTAINER_NAME failed to initialize in time." "alert"
         exit 1
     fi
@@ -180,7 +188,9 @@ find "$CONFIG_DIR" -type f \( -path "*/secret*/*" -o -name "*.db" -o -name "*.sq
 
 # TEST & RESTART
 echo "Testing Authelia configuration..."
-if docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config > /dev/null 2>&1; then
+VALIDATION_OUTPUT=$(docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config 2>&1)
+
+if [ $? -eq 0 ]; then
     echo "✅ Config valid. Restarting Authelia container..."
     sleep 2
     docker restart "$CONTAINER_NAME"
@@ -188,6 +198,9 @@ if docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml val
     rm -rf "$BACKUP_DIR" "$NEW_TEMP"
 else
     echo "❌ ERROR: New config INVALID. Rolling back..."
+    echo "--- CONFIGURATION VALIDATION LOGS ---"
+    echo "$VALIDATION_OUTPUT"
+    echo "-------------------------------------"
     send_notification "Update Failed - Rolling Back" "Invalid syntax in Authelia configuration. Reverted to backup." "alert"
     
     rm -rf "$CONFIG_DIR"/*
@@ -197,5 +210,3 @@ else
 fi
 
 echo ""
-
-
