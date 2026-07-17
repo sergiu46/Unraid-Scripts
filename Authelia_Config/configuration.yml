@@ -83,6 +83,10 @@ server:
     enable_pprof: false
     enable_expvars: false
   disable_healthcheck: false
+  trusted_proxies:
+    - 172.19.0.0/16
+    - 172.18.0.0/16
+    - 172.17.0.0/16
 
 log:
   level: info
@@ -111,14 +115,14 @@ webauthn:
   attestation_conveyance_preference: 'none'
   user_verification: 'preferred'
   timeout: 60s
-  
+
 session:
   name: authelia_session
   same_site: lax
   secret: '{{ secret "/config/secrets/session_secret" | trim }}'
   expiration: 1h
   inactivity: 5m
-  remember_me: 2M
+  remember_me: 1w
   cookies:
     - domain: '{{ secret "/config/secrets/domain" | trim }}'
       authelia_url: 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
