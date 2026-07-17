@@ -1,12 +1,16 @@
 ---
-###############################################################
-#                   Authelia configuration                    #
-#                                                             #
-# Use the command below for generating secrets                #
-# openssl rand -base64 32                                     #  
-# Use this command for generating oidc key                    #
-# openssl genrsa -out rsa.2048.key 2048                       #
-###############################################################
+#######################################################################################
+#                              Authelia configuration                                 #
+#                                                                                     #
+# Command for generating secrets                                                      #
+# openssl rand -base64 32                                                             #
+#                                                                                     #  
+# Command for generating oidc key                                                     #
+# openssl genrsa -out rsa.2048.key 2048                                               #
+#                                                                                     #
+# Command for hashing immich_client_secret                                            #
+# docker exec authelia authelia crypto hash generate pbkdf2 --password 'your-secret'  #
+#######################################################################################
 
 access_control:
   default_policy: deny
@@ -24,16 +28,6 @@ access_control:
         - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
       resources:
         - "^/api([/?].*)?$"
-        # - "^/identity.*$"
-        # - "^/triggers.*$"
-        # - "^/meshagents.*$"
-        # - "^/meshsettings.*$"
-        # - "^/agent.*$"
-        # - "^/control.*$"
-        # - "^/meshrelay.*$"
-        # - "^/wl.*$"
-        # - "^/plugins.*$"
-        # - "^/logging.*$"
       policy: bypass
 
     # Filbrowser share bypass
@@ -197,15 +191,6 @@ identity_providers:
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
           - 'app.immich:///oauth-callback'
-          # - 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
-          # - 'https://auth.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
-          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
-          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/auth/login'
-          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
-          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
-          # - 'app.immich:/'
-          # - 'app.immich:///oauth-callback'
-          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
         grant_types:
           - authorization_code
         response_types:
