@@ -84,11 +84,6 @@ server:
     enable_expvars: false
   disable_healthcheck: false
 
-trusted_proxies:
-    - 172.19.0.0/16
-    - 172.18.0.0/16
-    - 172.17.0.0/16
-
 log:
   level: info
 
