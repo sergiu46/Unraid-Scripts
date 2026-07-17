@@ -24,16 +24,16 @@ access_control:
         - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
       resources:
         - "^/api([/?].*)?$"
-        - "^/identity.*$"
-        - "^/triggers.*$"
-        - "^/meshagents.*$"
-        - "^/meshsettings.*$"
-        - "^/agent.*$"
-        - "^/control.*$"
-        - "^/meshrelay.*$"
-        - "^/wl.*$"
-        - "^/plugins.*$"
-        - "^/logging.*$"
+        # - "^/identity.*$"
+        # - "^/triggers.*$"
+        # - "^/meshagents.*$"
+        # - "^/meshsettings.*$"
+        # - "^/agent.*$"
+        # - "^/control.*$"
+        # - "^/meshrelay.*$"
+        # - "^/wl.*$"
+        # - "^/plugins.*$"
+        # - "^/logging.*$"
       policy: bypass
 
     # Filbrowser share bypass
@@ -193,15 +193,19 @@ identity_providers:
           - email
           - profile
         redirect_uris:
-          - 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
-          - 'https://auth.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
-          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/auth/login'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
-          - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
-          - 'app.immich:/'
-          - 'app.immich:///oauth-callback'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
+          - 'app.immich:///oauth-callback'
+          # - 'https://auth.{{ secret "/config/secrets/domain" | trim }}'
+          # - 'https://auth.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
+          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/oauth2/callback'
+          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/auth/login'
+          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
+          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
+          # - 'app.immich:/'
+          # - 'app.immich:///oauth-callback'
+          # - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
         grant_types:
           - authorization_code
         response_types:
