@@ -8,6 +8,67 @@
 # openssl genrsa -out rsa.2048.key 2048                       #
 ###############################################################
 
+access_control:
+  default_policy: deny
+  rules:
+    # authelia
+    - domain: 
+        - 'auth.{{ secret "/config/secrets/domain" | trim }}'
+      policy: bypass
+
+    # Services with app
+    - domain:
+        - 'vuetorrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'qbittorrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'torrent.{{ secret "/config/secrets/domain" | trim }}'
+        - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
+      resources:
+        - "^/api([/?].*)?$"
+        - "^/identity.*$"
+        - "^/triggers.*$"
+        - "^/meshagents.*$"
+        - "^/meshsettings.*$"
+        - "^/agent.*$"
+        - "^/control.*$"
+        - "^/meshrelay.*$"
+        - "^/wl.*$"
+        - "^/plugins.*$"
+        - "^/logging.*$"
+      policy: bypass
+
+    # Filbrowser share bypass
+    - domain:
+        - 'files.{{ secret "/config/secrets/domain" | trim }}'
+        - 'filebrowser.{{ secret "/config/secrets/domain" | trim }}'
+      resources:
+        - "^/api/public/dl/.*"
+        - "^/share/.*"
+        - "^/static/js/.*"
+        - "^/static/css/.*"
+        - "^/static/img/.*"
+        - "^/static/themes/.*"
+        - "^/static/fonts/.*"
+        - "^/static/assets/.*"
+      policy: bypass
+
+    # VaultWarden
+    - domain: 
+        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
+      policy: deny
+      resources:
+        - "^/admin.*$"
+    - domain:
+        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
+        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
+      policy: bypass
+
+    # catch-all
+    - domain:
+        - '*.{{ secret "/config/secrets/domain" | trim }}'
+      policy: two_factor
+
+
 theme: dark
 identity_validation:
   reset_password:
@@ -44,66 +105,13 @@ authentication_backend:
       parallelism: 8
       memory: 64
 
-access_control:
-  default_policy: deny
-  rules:
-    # authelia
-    - domain: 
-        - 'auth.{{ secret "/config/secrets/domain" | trim }}'
-      policy: bypass
-
-    # VueTorrent
-    - domain:
-        - 'vuetorrent.{{ secret "/config/secrets/domain" | trim }}'
-        - 'qbittorrent.{{ secret "/config/secrets/domain" | trim }}'
-        - 'torrent.{{ secret "/config/secrets/domain" | trim }}'
-        - 'paperless.{{ secret "/config/secrets/domain" | trim }}'
-      resources:
-        - "^/api([/?].*)?$"
-        - "^/identity.*$"
-        - "^/triggers.*$"
-        - "^/meshagents.*$"
-        - "^/meshsettings.*$"
-        - "^/agent.*$"
-        - "^/control.*$"
-        - "^/meshrelay.*$"
-        - "^/wl.*$"
-        - "^/plugins.*$"
-        - "^/logging.*$"
-      policy: bypass
-
-    # Filbrowser share bypass
-    - domain:
-        - 'files.{{ secret "/config/secrets/domain" | trim }}'
-        - 'filebrowser.{{ secret "/config/secrets/domain" | trim }}'
-      resources:
-        - "^/api/public/dl/.*"
-        - "^/share/.*"
-        - "^/static/js/.*"
-        - "^/static/css/.*"
-        - "^/static/img/.*"
-        - "^/static/themes/.*"
-        - "^/static/fonts/.*"
-        - "^/static/assets/.*"
-      policy: bypass
-
-    # VaultWarden  
-    - domain: 
-        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
-        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
-      policy: deny
-      resources:
-        - "^/admin.*$"
-    - domain:
-        - 'vaultwarden.{{ secret "/config/secrets/domain" | trim }}'
-        - 'bitwarden.{{ secret "/config/secrets/domain" | trim }}'
-      policy: bypass
-
-    # catch-all
-    - domain:
-        - '*.{{ secret "/config/secrets/domain" | trim }}'
-      policy: two_factor
-
+webauthn:
+  disable: false
+  display_name: 'My Security Keys'
+  attestation_conveyance_preference: 'none'
+  user_verification: 'preferred'
+  timeout: 60s
+  
 session:
   name: authelia_session
   same_site: lax
