@@ -1,15 +1,15 @@
----
 #######################################################################################
-#                              Authelia configuration                                 #
-#                                                                                     #
-# Command for generating secrets                                                      #
-# openssl rand -base64 32                                                             #
-#                                                                                     #  
-# Command for generating oidc key                                                     #
-# openssl genrsa -out rsa.2048.key 2048                                               #
-#                                                                                     #
-# Command for hashing immich_client_secret                                            #
-# docker exec Authelia authelia crypto hash generate pbkdf2 --password 'your-secret'  #
+# Authelia configuration
+#  
+# Command for generating secrets
+# openssl rand -base64 32
+#
+# Command for generating oidc key
+# openssl genrsa -out rsa.2048.key 2048
+#
+# Command for hashing immich_client_secret
+# docker exec Authelia authelia crypto hash generate pbkdf2 --password 'your-secret'
+#
 #######################################################################################
 
 access_control:
@@ -172,17 +172,19 @@ identity_providers:
       allowed_origins:
         - 'https://immich.{{ secret "/config/secrets/domain" | trim }}'
       allowed_origins_from_client_redirect_uris: false
-clients:
+    clients:
       - client_id: 'immich'
         client_name: 'Immich'
         client_secret: '{{ secret "/config/secrets/immich_client_secret" | trim }}'
         public: false
+        authorization_policy: 'two_factor'
         require_pkce: false
+        pkce_challenge_method: ''
         redirect_uris:
+          - 'app.immich:///oauth-callback'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/auth/login'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/user-settings'
           - 'https://immich.{{ secret "/config/secrets/domain" | trim }}/api/oauth/mobile-redirect'
-          - 'app.immich:///oauth-callback'
         scopes:
           - 'openid'
           - 'profile'
@@ -194,5 +196,3 @@ clients:
         id_token_signed_response_alg: 'RS256'
         userinfo_signed_response_alg: 'RS256'
         token_endpoint_auth_method: 'client_secret_post'
-
-...
