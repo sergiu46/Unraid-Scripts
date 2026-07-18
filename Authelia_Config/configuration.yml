@@ -157,7 +157,7 @@ identity_providers:
     enable_jwt_access_token_stateless_introspection: false
     discovery_signed_response_alg: 'RS256'
     discovery_signed_response_key_id: 'authelia'
-    require_pushed_authorization_requests: false
+    require_pushed_authorization_requests: true
     lifespans:
       access_token: '1h'
       authorize_code: '1m'
