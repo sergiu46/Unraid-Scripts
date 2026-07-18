@@ -105,32 +105,6 @@ while ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; do
 done
 echo "✅ $CONTAINER_NAME is online."
 
-# WAIT FOR AUTHELIA TO INITIALIZE INSIDE CONTAINER
-INIT_MAX_RETRIES=12
-INIT_RETRY_COUNT=0
-INIT_WAIT_SECONDS=5
-
-echo "Waiting for Authelia to initialize inside $CONTAINER_NAME..."
-while true; do
-    INIT_OUTPUT=$(docker exec "$CONTAINER_NAME" authelia --config /config/configuration.yml validate-config 2>&1)
-    if [ $? -eq 0 ]; then
-        break
-    fi
-    
-    INIT_RETRY_COUNT=$((INIT_RETRY_COUNT + 1))
-    if [ $INIT_RETRY_COUNT -ge $INIT_MAX_RETRIES ]; then
-        echo "❌ Error: Authelia failed to initialize within $((INIT_MAX_RETRIES * INIT_WAIT_SECONDS))s. Aborting."
-        echo "--- INITIALIZATION VALIDATION LOGS ---"
-        echo "$INIT_OUTPUT"
-        echo "--------------------------------------"
-        send_notification "Sync Aborted" "Authelia process inside $CONTAINER_NAME failed to initialize in time." "alert"
-        exit 1
-    fi
-    echo "Waiting for internal Authelia readiness (Attempt $INIT_RETRY_COUNT/$INIT_MAX_RETRIES)..."
-    sleep $INIT_WAIT_SECONDS
-done
-echo "✅ Authelia is fully initialized. Proceeding with sync."
-
 # BACKUP
 if [ -d "$CONFIG_DIR" ]; then
     rm -rf "$BACKUP_DIR" 
