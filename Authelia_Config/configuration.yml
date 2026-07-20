@@ -123,6 +123,7 @@ session:
   redis:
     host: redis
     port: 6379
+    password: '{{ secret "/config/secrets/redis_password" | trim }}'
     timeout: '30s'
     max_retries: 10
     database_index: 2
