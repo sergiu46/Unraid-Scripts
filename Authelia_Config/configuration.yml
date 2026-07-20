@@ -159,7 +159,7 @@ identity_providers:
     enable_jwt_access_token_stateless_introspection: false
     discovery_signed_response_alg: 'RS256'
     discovery_signed_response_key_id: 'authelia'
-    require_pushed_authorization_requests: true
+    require_pushed_authorization_requests: false
     lifespans:
       access_token: '1h'
       authorize_code: '1m'
@@ -179,7 +179,6 @@ identity_providers:
         client_name: 'Immich'
         client_secret: '{{ secret "/config/secrets/immich_client_secret" | trim }}'
         public: false
-        require_pushed_authorization_requests: false
         authorization_policy: 'two_factor'
         require_pkce: false
         pkce_challenge_method: ''
