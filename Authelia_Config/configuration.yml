@@ -179,6 +179,7 @@ identity_providers:
         client_name: 'Immich'
         client_secret: '{{ secret "/config/secrets/immich_client_secret" | trim }}'
         public: false
+        require_pushed_authorization_requests: false
         authorization_policy: 'two_factor'
         require_pkce: false
         pkce_challenge_method: ''
