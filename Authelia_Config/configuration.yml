@@ -93,11 +93,13 @@ authentication_backend:
   file:
     path: /config/users_database.yml
     password:
-      algorithm: argon2id
-      iterations: 3
-      salt_length: 16
-      parallelism: 8
-      memory: 64
+      algorithm: argon2
+      argon2:
+        variant: argon2id
+        iterations: 3
+        memory: 65536
+        parallelism: 8
+        salt_length: 16
 
 webauthn:
   disable: false
