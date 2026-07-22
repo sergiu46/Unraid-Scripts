@@ -1,7 +1,7 @@
 #######################################################################################
 # Authelia configuration
 # 
-# For this config to work you need to add the filter template
+# For this config to work you need to add the filter template variable:
 # 'X_AUTHELIA_CONFIG_FILTERS'='template'
 #  
 # Command for generating secrets
