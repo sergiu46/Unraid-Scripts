@@ -1,5 +1,8 @@
 #######################################################################################
 # Authelia configuration
+# 
+# For this config to work you need to add the filter template
+# 'X_AUTHELIA_CONFIG_FILTERS'='template'
 #  
 # Command for generating secrets
 # openssl rand -base64 32
