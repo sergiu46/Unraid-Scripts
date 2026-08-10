@@ -11,23 +11,19 @@
 
 # #!/bin/bash
 #
-# # List of containers to strictly ignore/exclude from auto-updates
+# # Config
 # EXCLUDE_CONTAINERS=(
-#    "example_container_1"
-#    "example_container_2"
+#     "example_container_1"
+#     "example_container_2"
 # )
 #
-# # MINIMUM NUMBER OF DAYS SINCE RELEASE TO PERFORM THE UPDATE
-# DELAY_DAYS=3
-# # Remove newly pulled image if it doesn't meet the age requirement ("true" or "false")
+# DELAY_DAYS=5
 # REMOVE_SKIPPED_IMAGE="true"
-# # Prune orphan/dangling images left behind after container updates ("true" or "false")
 # PRUNE_DANGLING="true"
-# # Notification mode: "all", "updated", "error", or "none"
-# NOTIFICATION_TYPE="all"
+# NOTIFICATION_TYPE="all" # "all", "updated", "error", or "none"
 #
-#
-# # Script config. DEBUG "true" or "false".
+# # Script config
+# DEBUG="false"
 # DIR="/dev/shm/docker_auto_update"
 # URL="https://raw.githubusercontent.com/sergiu46/Unraid-Scripts/main/Docker_Auto_Update.sh"
 #
