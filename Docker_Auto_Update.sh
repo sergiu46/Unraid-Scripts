@@ -144,46 +144,44 @@ echo ""
 # Process Notifications based on NOTIFICATION_TYPE
 SHOULD_NOTIFY=false
 NOTIF_SEVERITY="normal"
+NOTIF_BODY=""
 
-case "$NOTIFICATION_TYPE" in
-    "all")
+if [[ "$NOTIFICATION_TYPE" != "none" ]]; then
+    if [[ "$NOTIFICATION_TYPE" == "all" ]]; then
         SHOULD_NOTIFY=true
-        [[ $ERROR_COUNT -gt 0 ]] && NOTIF_SEVERITY="warning"
-        ;;
-    "updated"|"info")
-        if [ $UPDATED_COUNT -gt 0 ]; then
-            SHOULD_NOTIFY=true
-            NOTIF_SEVERITY="normal"
-        fi
-        ;;
-    "error")
-        if [ $ERROR_COUNT -gt 0 ]; then
-            SHOULD_NOTIFY=true
-            NOTIF_SEVERITY="warning"
-        fi
-        ;;
-esac
-
-if [ "$SHOULD_NOTIFY" = true ]; then
-    NOTIF_BODY="Updated: $UPDATED_COUNT | Skipped: $SKIPPED_COUNT | OK: $OK_COUNT | Errors: $ERROR_COUNT"
-    
-    if [ ${#UPDATED_LIST[@]} -gt 0 ]; then
-        NOTIF_BODY+=$'\n\n'
-        NOTIF_BODY+="🔄 Updated:"
-        for item in "${UPDATED_LIST[@]}"; do
-            NOTIF_BODY+=$'\n'" • $item"
-        done
+        NOTIF_BODY="Updated: $UPDATED_COUNT | Skipped: $SKIPPED_COUNT | OK: $OK_COUNT | Errors: $ERROR_COUNT"
+    elif [[ "$NOTIFICATION_TYPE" == "updated" && $UPDATED_COUNT -gt 0 ]]; then
+        SHOULD_NOTIFY=true
+        NOTIF_BODY="Updated containers: $UPDATED_COUNT"
     fi
 
-    if [ ${#ERROR_LIST[@]} -gt 0 ]; then
-        NOTIF_BODY+=$'\n\n'
-        NOTIF_BODY+="❌ Errors:"
-        for item in "${ERROR_LIST[@]}"; do
-            NOTIF_BODY+=$'\n'" • $item"
-        done
+    # Errors should always be sent (override and append)
+    if [[ $ERROR_COUNT -gt 0 ]]; then
+        SHOULD_NOTIFY=true
+        NOTIF_SEVERITY="warning"
     fi
 
-    unraid_notify "Docker Auto-Update" "$NOTIF_BODY" "$NOTIF_SEVERITY"
+    if [[ "$SHOULD_NOTIFY" == "true" ]]; then
+        # Append Updated list for 'all' or 'updated' modes if there are updates
+        if [[ $UPDATED_COUNT -gt 0 ]] && [[ "$NOTIFICATION_TYPE" == "all" || "$NOTIFICATION_TYPE" == "updated" ]]; then
+            [[ -n "$NOTIF_BODY" ]] && NOTIF_BODY+=$'\n\n'
+            NOTIF_BODY+="🔄 Updated:"
+            for item in "${UPDATED_LIST[@]}"; do
+                NOTIF_BODY+=$'\n'" • $item"
+            done
+        fi
+
+        # Always append Errors list if they exist
+        if [[ $ERROR_COUNT -gt 0 ]]; then
+            [[ -n "$NOTIF_BODY" ]] && NOTIF_BODY+=$'\n\n'
+            NOTIF_BODY+="❌ Errors:"
+            for item in "${ERROR_LIST[@]}"; do
+                NOTIF_BODY+=$'\n'" • $item"
+            done
+        fi
+
+        unraid_notify "Docker Auto-Update" "$NOTIF_BODY" "$NOTIF_SEVERITY"
+    fi
 fi
 
 # Cap log size.
