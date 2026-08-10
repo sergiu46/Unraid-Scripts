@@ -13,6 +13,10 @@
 #
 # # MINIMUM NUMBER OF DAYS SINCE RELEASE TO PERFORM THE UPDATE
 # DELAY_DAYS=3
+# # Remove newly pulled image if it doesn't meet the age requirement ("true" or "false")
+# REMOVE_SKIPPED_IMAGE="true"
+# # Prune orphan/dangling images left behind after container updates ("true" or "false")
+# PRUNE_DANGLING="true"
 #
 # # Script config. DEBUG "true" or "false".
 # DIR="/dev/shm/docker_auto_update"
@@ -33,12 +37,12 @@
 
 #!/bin/bash
 
+UNRAID_UPDATE_SCRIPT="/usr/local/emhttp/plugins/dynamix.docker.manager/scripts/update_container"
+REMOVE_SKIPPED_IMAGE="${REMOVE_SKIPPED_IMAGE:-true}"
+PRUNE_DANGLING="${PRUNE_DANGLING:-true}"
+
 echo "🚀 === Start Docker updates check (Release >= ${DELAY_DAYS:-3} days) ==="
 echo "----------------------------------------------------------------------"
-
-
-# Variables
-UNRAID_UPDATE_SCRIPT="/usr/local/emhttp/plugins/dynamix.docker.manager/scripts/update_container"
 
 NOW_SEC=$(date +%s)
 CONTAINERS=$(docker ps --format '{{.Names}}')
@@ -73,8 +77,12 @@ for CONTAINER in $CONTAINERS; do
                     echo "❌ [ERROR]    Unraid native script not found."
                 fi
             else
-                echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: $DELAY_DAYS days). Removing image."
-                docker image rm "$LATEST_ID" > /dev/null 2>&1
+                if [ "$REMOVE_SKIPPED_IMAGE" == "true" ]; then
+                    echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: $DELAY_DAYS days). Removing image."
+                    docker image rm "$LATEST_ID" > /dev/null 2>&1
+                else
+                    echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: $DELAY_DAYS days). Keeping image."
+                fi
             fi
         else
             echo "❌ [ERROR]    $CONTAINER - Could not calculate release date for $IMAGE."
@@ -83,6 +91,12 @@ for CONTAINER in $CONTAINERS; do
         echo "✅ [OK]       $CONTAINER - Already running the latest version."
     fi
 done
+
+if [ "$PRUNE_DANGLING" == "true" ]; then
+    echo "----------------------------------------------------------------------"
+    echo "🧹 [CLEANUP]  Pruning orphan/dangling images..."
+    docker image prune -f > /dev/null 2>&1
+fi
 
 echo "----------------------------------------------------------------------"
 echo "🏁 === Check completed ==="
