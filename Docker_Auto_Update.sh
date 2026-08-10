@@ -44,32 +44,36 @@ REMOVE_SKIPPED_IMAGE="${REMOVE_SKIPPED_IMAGE:-true}"
 PRUNE_DANGLING="${PRUNE_DANGLING:-true}"
 NOTIFICATION_TYPE="${NOTIFICATION_TYPE:-all}"
 
-# Tracking counters and details
+# TRACKING VARIABLES
 UPDATED_COUNT=0
 SKIPPED_COUNT=0
 OK_COUNT=0
 ERROR_COUNT=0
-
+SUMMARY_LOG=""
 UPDATED_LIST=()
 ERROR_LIST=()
 
+# Clean logs
+SCRIPT_NAME=$(basename "$(dirname "$0")")
+LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
+if [ "$DEBUG" != "true" ] && [ -f "$LOG_FILE" ]; then
+    : > "$LOG_FILE"
+fi
+
+# FUNCTIONS
 unraid_notify() {
-    local subject="$1"
-    local message="$2"
-    local severity="${3:-normal}"
-    
-    local mode="${NOTIFICATION_TYPE:-all}"
-    
-    [[ "$mode" == "none" ]] && return 0
+    local title_msg="$1"; local message="$2"; local severity="$3"; local bubble="$4"; local web_msg="$5"
     
     if [ -f "/usr/local/emhttp/webGui/scripts/notify" ]; then
         /usr/local/emhttp/webGui/scripts/notify \
-            -s "$subject" \
-            -d "$message" \
-            -i "$severity"
+            -i "$severity" \
+            -s "$bubble $title_msg" \
+            -d "$web_msg" \
+            -m "$(printf "%b" "$message")"
     fi
 }
 
+# MAIN EXECUTION
 echo "🚀 === Start Docker updates check (Release >= ${DELAY_DAYS:-3} days) ==="
 echo "----------------------------------------------------------------------"
 
@@ -86,8 +90,8 @@ for CONTAINER in $CONTAINERS; do
 
     if [ -z "$LATEST_ID" ]; then
         echo "❌ [ERROR]    $CONTAINER - Could not verify the image."
-        ERROR_COUNT=$((ERROR_COUNT + 1))
-        ERROR_LIST+=("$CONTAINER: Could not verify image")
+        ((ERROR_COUNT++))
+        ERROR_LIST+=("$CONTAINER (Verification failed)")
         continue
     fi
 
@@ -104,15 +108,15 @@ for CONTAINER in $CONTAINERS; do
                 echo "🔄 [UPDATE]   $CONTAINER - New version ($AGE_DAYS days old). Updating..."
                 if [ -f "$UNRAID_UPDATE_SCRIPT" ]; then
                     "$UNRAID_UPDATE_SCRIPT" "$CONTAINER" > /dev/null 2>&1
-                    UPDATED_COUNT=$((UPDATED_COUNT + 1))
+                    ((UPDATED_COUNT++))
                     UPDATED_LIST+=("$CONTAINER ($AGE_DAYS days old)")
                 else
                     echo "❌ [ERROR]    Unraid native script not found."
-                    ERROR_COUNT=$((ERROR_COUNT + 1))
-                    ERROR_LIST+=("$CONTAINER: Unraid update script missing")
+                    ((ERROR_COUNT++))
+                    ERROR_LIST+=("$CONTAINER (Unraid script missing)")
                 fi
             else
-                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                ((SKIPPED_COUNT++))
                 if [ "$REMOVE_SKIPPED_IMAGE" == "true" ]; then
                     echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: ${DELAY_DAYS:-3} days). Removing image."
                     docker image rm "$LATEST_ID" > /dev/null 2>&1
@@ -122,12 +126,12 @@ for CONTAINER in $CONTAINERS; do
             fi
         else
             echo "❌ [ERROR]    $CONTAINER - Could not calculate release date for $IMAGE."
-            ERROR_COUNT=$((ERROR_COUNT + 1))
-            ERROR_LIST+=("$CONTAINER: Could not calculate release date")
+            ((ERROR_COUNT++))
+            ERROR_LIST+=("$CONTAINER (Date calculation failed)")
         fi
     else
         echo "✅ [OK]       $CONTAINER - Already running the latest version."
-        OK_COUNT=$((OK_COUNT + 1))
+        ((OK_COUNT++))
     fi
 done
 
@@ -137,50 +141,68 @@ if [ "$PRUNE_DANGLING" == "true" ]; then
     docker image prune -f > /dev/null 2>&1
 fi
 
+# FINAL REPORT
+NOTIFY_TITLE="Docker Auto-Update"
+NOTIFY_SEVERITY="normal"
+NOTIFY_BUBBLE="🟢"
+SHORT_MSG="Containers checked successfully!"
+
+if [ "$ERROR_COUNT" -gt 0 ]; then
+    if [ "$UPDATED_COUNT" -gt 0 ] || [ "$OK_COUNT" -gt 0 ] || [ "$SKIPPED_COUNT" -gt 0 ]; then
+        NOTIFY_SEVERITY="warning"
+        NOTIFY_BUBBLE="🟡"
+        SHORT_MSG="Updates completed with some errors!"
+    else
+        NOTIFY_SEVERITY="alert"
+        NOTIFY_BUBBLE="🔴"
+        SHORT_MSG="All update operations failed!"
+    fi
+elif [ "$UPDATED_COUNT" -gt 0 ]; then
+    NOTIFY_SEVERITY="normal"
+    NOTIFY_BUBBLE="🟢"
+    SHORT_MSG="Successfully updated $UPDATED_COUNT container(s)!"
+fi
+
+# Build Multi-line Summary
+SUMMARY_LOG="📊 Stats: $UPDATED_COUNT Updated | $SKIPPED_COUNT Skipped | $OK_COUNT OK | $ERROR_COUNT Errors\n"
+
+if [ ${#UPDATED_LIST[@]} -gt 0 ]; then
+    SUMMARY_LOG+="\n🔄 UPDATED:\n"
+    for item in "${UPDATED_LIST[@]}"; do
+        SUMMARY_LOG+="↳ 📦 $item\n"
+    done
+fi
+
+if [ ${#ERROR_LIST[@]} -gt 0 ]; then
+    SUMMARY_LOG+="\n❌ ERRORS:\n"
+    for item in "${ERROR_LIST[@]}"; do
+        SUMMARY_LOG+="↳ ⚠️ $item\n"
+    done
+fi
+
+echo "----------------------------------------------------------------------"
+echo ""
+echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
 echo "----------------------------------------------------------------------"
 echo "🏁 === Check completed ==="
 echo ""
 
 # Process Notifications based on NOTIFICATION_TYPE
 SHOULD_NOTIFY=false
-NOTIF_SEVERITY="normal"
-NOTIF_BODY=""
 
 if [[ "$NOTIFICATION_TYPE" != "none" ]]; then
     if [[ "$NOTIFICATION_TYPE" == "all" ]]; then
         SHOULD_NOTIFY=true
-        NOTIF_BODY="Updated: $UPDATED_COUNT | Skipped: $SKIPPED_COUNT | OK: $OK_COUNT | Errors: $ERROR_COUNT"
     elif [[ "$NOTIFICATION_TYPE" == "updated" && $UPDATED_COUNT -gt 0 ]]; then
         SHOULD_NOTIFY=true
-        NOTIF_BODY="Updated containers: $UPDATED_COUNT"
     fi
 
-    # Errors should always be sent (override and append)
     if [[ $ERROR_COUNT -gt 0 ]]; then
         SHOULD_NOTIFY=true
-        NOTIF_SEVERITY="warning"
     fi
 
     if [[ "$SHOULD_NOTIFY" == "true" ]]; then
-        # Append Updated list for 'all' or 'updated' modes if there are updates
-        if [[ $UPDATED_COUNT -gt 0 ]] && [[ "$NOTIFICATION_TYPE" == "all" || "$NOTIFICATION_TYPE" == "updated" ]]; then
-            [[ -n "$NOTIF_BODY" ]] && NOTIF_BODY+=$'\n\n'
-            NOTIF_BODY+="🔄 Updated:"
-            for item in "${UPDATED_LIST[@]}"; do
-                NOTIF_BODY+=$'\n'" • $item"
-            done
-        fi
-
-        # Always append Errors list if they exist
-        if [[ $ERROR_COUNT -gt 0 ]]; then
-            [[ -n "$NOTIF_BODY" ]] && NOTIF_BODY+=$'\n\n'
-            NOTIF_BODY+="❌ Errors:"
-            for item in "${ERROR_LIST[@]}"; do
-                NOTIF_BODY+=$'\n'" • $item"
-            done
-        fi
-
-        unraid_notify "Docker Auto-Update" "$NOTIF_BODY" "$NOTIF_SEVERITY"
+        unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE" "$SHORT_MSG"
     fi
 fi
 
@@ -192,9 +214,7 @@ LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
 if [ -f "$LOG_FILE" ]; then
     CURRENT_LINES=$(wc -l < "$LOG_FILE")
     if [ "$CURRENT_LINES" -gt "$MAX_LOG_LINES" ]; then
-        # Capture the last X lines
         tail -n "$MAX_LOG_LINES" "$LOG_FILE" > "$LOG_FILE.tmp"
-        # Overwrite the log file using cat to preserve the file descriptor
         cat "$LOG_FILE.tmp" > "$LOG_FILE"
         rm "$LOG_FILE.tmp"
         echo "✂️ Log capped to $MAX_LOG_LINES lines." >> "$LOG_FILE"
