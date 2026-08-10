@@ -4,12 +4,18 @@
 # HOW TO USE:
 # 1. Create a new "User Script" in Unraid.
 # 2. Copy the block below and paste it into the script editor.
-# 3. Adjust variables (DELAY_DAYS, REMOVE_SKIPPED_IMAGE, NOTIFICATION_TYPE) if needed.
+# 3. Adjust variables (DELAY_DAYS, REMOVE_SKIPPED_IMAGE, NOTIFICATION_TYPE, EXCLUDE_CONTAINERS) if needed.
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 
 
 # #!/bin/bash
+#
+# # List of containers to strictly ignore/exclude from auto-updates
+# EXCLUDE_CONTAINERS=(
+#    "example_container_1"
+#    "example_container_2"
+# )
 #
 # # MINIMUM NUMBER OF DAYS SINCE RELEASE TO PERFORM THE UPDATE
 # DELAY_DAYS=3
@@ -19,6 +25,7 @@
 # PRUNE_DANGLING="true"
 # # Notification mode: "all", "updated", "error", or "none"
 # NOTIFICATION_TYPE="all"
+#
 #
 # # Script config. DEBUG "true" or "false".
 # DIR="/dev/shm/docker_auto_update"
@@ -47,10 +54,10 @@ NOTIFICATION_TYPE="${NOTIFICATION_TYPE:-all}"
 # TRACKING VARIABLES
 UPDATED_COUNT=0
 SKIPPED_COUNT=0
-OK_COUNT=0
 ERROR_COUNT=0
-SUMMARY_LOG=""
+
 UPDATED_LIST=()
+SKIPPED_LIST=()
 ERROR_LIST=()
 
 # Clean logs
@@ -73,6 +80,12 @@ unraid_notify() {
     fi
 }
 
+contains_element() {
+    local e match="$1"; shift
+    for e; do [[ "$e" == "$match" ]] && return 0; done
+    return 1
+}
+
 # MAIN EXECUTION
 echo "🚀 === Start Docker updates check (Release >= ${DELAY_DAYS:-3} days) ==="
 echo "----------------------------------------------------------------------"
@@ -81,6 +94,11 @@ NOW_SEC=$(date +%s)
 CONTAINERS=$(docker ps --format '{{.Names}}')
 
 for CONTAINER in $CONTAINERS; do
+    # Check if container is in the exclusion list
+    if contains_element "$CONTAINER" "${EXCLUDE_CONTAINERS[@]}"; then
+        continue
+    fi
+
     IMAGE=$(docker inspect --format '{{.Config.Image}}' "$CONTAINER")
     CURRENT_ID=$(docker inspect --format '{{.Image}}' "$CONTAINER")
 
@@ -117,6 +135,7 @@ for CONTAINER in $CONTAINERS; do
                 fi
             else
                 ((SKIPPED_COUNT++))
+                SKIPPED_LIST+=("$CONTAINER ($AGE_DAYS/${DELAY_DAYS:-3} days)")
                 if [ "$REMOVE_SKIPPED_IMAGE" == "true" ]; then
                     echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: ${DELAY_DAYS:-3} days). Removing image."
                     docker image rm "$LATEST_ID" > /dev/null 2>&1
@@ -129,9 +148,6 @@ for CONTAINER in $CONTAINERS; do
             ((ERROR_COUNT++))
             ERROR_LIST+=("$CONTAINER (Date calculation failed)")
         fi
-    else
-        echo "✅ [OK]       $CONTAINER - Already running the latest version."
-        ((OK_COUNT++))
     fi
 done
 
@@ -148,7 +164,7 @@ NOTIFY_BUBBLE="🟢"
 SHORT_MSG="Containers checked successfully!"
 
 if [ "$ERROR_COUNT" -gt 0 ]; then
-    if [ "$UPDATED_COUNT" -gt 0 ] || [ "$OK_COUNT" -gt 0 ] || [ "$SKIPPED_COUNT" -gt 0 ]; then
+    if [ "$UPDATED_COUNT" -gt 0 ] || [ "$SKIPPED_COUNT" -gt 0 ]; then
         NOTIFY_SEVERITY="warning"
         NOTIFY_BUBBLE="🟡"
         SHORT_MSG="Updates completed with some errors!"
@@ -163,26 +179,36 @@ elif [ "$UPDATED_COUNT" -gt 0 ]; then
     SHORT_MSG="Successfully updated $UPDATED_COUNT container(s)!"
 fi
 
-# Build Multi-line Summary
-SUMMARY_LOG="📊 Stats: $UPDATED_COUNT Updated | $SKIPPED_COUNT Skipped | $OK_COUNT OK | $ERROR_COUNT Errors\n"
+# Build Outputs
+STATS_LOG="📊 Stats: $UPDATED_COUNT Updated | $SKIPPED_COUNT Skipped | $ERROR_COUNT Errors"
+NOTIF_LOG="$STATS_LOG\n"
 
 if [ ${#UPDATED_LIST[@]} -gt 0 ]; then
-    SUMMARY_LOG+="\n🔄 UPDATED:\n"
+    NOTIF_LOG+="\n🔄 UPDATED:\n"
     for item in "${UPDATED_LIST[@]}"; do
-        SUMMARY_LOG+="↳ 📦 $item\n"
+        NOTIF_LOG+="  • $item\n"
+    done
+fi
+
+if [ ${#SKIPPED_LIST[@]} -gt 0 ]; then
+    NOTIF_LOG+="\n⏳ SKIPPED (Pending Age):\n"
+    for item in "${SKIPPED_LIST[@]}"; do
+        NOTIF_LOG+="  • $item\n"
     done
 fi
 
 if [ ${#ERROR_LIST[@]} -gt 0 ]; then
-    SUMMARY_LOG+="\n❌ ERRORS:\n"
+    NOTIF_LOG+="\n❌ ERRORS:\n"
     for item in "${ERROR_LIST[@]}"; do
-        SUMMARY_LOG+="↳ ⚠️ $item\n"
+        NOTIF_LOG+="  • $item\n"
     done
 fi
 
+# Print ONLY the stats line to the terminal/log
 echo "----------------------------------------------------------------------"
 echo ""
-echo -e "📊 FINAL SUMMARY:\n$SUMMARY_LOG"
+echo -e "FINAL SUMMARY:\n$STATS_LOG"
+echo ""
 echo "----------------------------------------------------------------------"
 echo "🏁 === Check completed ==="
 echo ""
@@ -202,7 +228,7 @@ if [[ "$NOTIFICATION_TYPE" != "none" ]]; then
     fi
 
     if [[ "$SHOULD_NOTIFY" == "true" ]]; then
-        unraid_notify "$NOTIFY_TITLE" "$SUMMARY_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE" "$SHORT_MSG"
+        unraid_notify "$NOTIFY_TITLE" "$NOTIF_LOG" "$NOTIFY_SEVERITY" "$NOTIFY_BUBBLE" "$SHORT_MSG"
     fi
 fi
 
