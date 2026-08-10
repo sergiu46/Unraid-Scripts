@@ -96,6 +96,7 @@ CONTAINERS=$(docker ps --format '{{.Names}}')
 for CONTAINER in $CONTAINERS; do
     # Check if container is in the exclusion list
     if contains_element "$CONTAINER" "${EXCLUDE_CONTAINERS[@]}"; then
+        echo "⏭️ [EXCLUDED] $CONTAINER - Excluded from auto-updates."
         continue
     fi
 
@@ -148,6 +149,8 @@ for CONTAINER in $CONTAINERS; do
             ((ERROR_COUNT++))
             ERROR_LIST+=("$CONTAINER (Date calculation failed)")
         fi
+    else
+        echo "✅ [OK]       $CONTAINER - Already running the latest version."
     fi
 done
 
@@ -179,7 +182,7 @@ elif [ "$UPDATED_COUNT" -gt 0 ]; then
     SHORT_MSG="Successfully updated $UPDATED_COUNT container(s)!"
 fi
 
-# Build Outputs
+# Build Notification Output
 STATS_LOG="📊 Stats: $UPDATED_COUNT Updated | $SKIPPED_COUNT Skipped | $ERROR_COUNT Errors"
 NOTIF_LOG="$STATS_LOG\n"
 
@@ -204,7 +207,7 @@ if [ ${#ERROR_LIST[@]} -gt 0 ]; then
     done
 fi
 
-# Print ONLY the stats line to the terminal/log
+# Terminal Final Summary
 echo "----------------------------------------------------------------------"
 echo ""
 echo -e "FINAL SUMMARY:\n$STATS_LOG"
