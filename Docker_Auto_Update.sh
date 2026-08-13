@@ -83,8 +83,12 @@ contains_element() {
 }
 
 # MAIN EXECUTION
-echo "🚀 === Start Docker updates check (Release >= ${DELAY_DAYS:-3} days) ==="
-echo "----------------------------------------------------------------------"
+echo "----------------------------------------------------"
+echo ""
+echo "🚀 Start Docker updates check (Release >= ${DELAY_DAYS:-3} days)"
+echo ""
+echo "----------------------------------------------------"
+
 
 NOW_SEC=$(date +%s)
 CONTAINERS=$(docker ps --format '{{.Names}}')
@@ -208,9 +212,11 @@ echo "----------------------------------------------------------------------"
 echo ""
 echo -e "FINAL SUMMARY:\n$STATS_LOG"
 echo ""
-echo "----------------------------------------------------------------------"
-echo "🏁 === Check completed ==="
+echo "----------------------------------------------------"
 echo ""
+echo "🏁 Docker update check completed."
+echo ""
+echo "----------------------------------------------------"
 
 # Process Notifications based on NOTIFICATION_TYPE
 SHOULD_NOTIFY=false
