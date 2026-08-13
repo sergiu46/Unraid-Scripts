@@ -155,7 +155,7 @@ for CONTAINER in $CONTAINERS; do
 done
 
 if [ "$PRUNE_DANGLING" == "true" ]; then
-    echo "----------------------------------------------------"
+    echo ""
     echo "🧹 [CLEANUP]  Pruning orphan/dangling images..."
     docker image prune -f > /dev/null 2>&1
 fi
@@ -208,7 +208,6 @@ if [ ${#ERROR_LIST[@]} -gt 0 ]; then
 fi
 
 # Terminal Final Summary
-echo "----------------------------------------------------"
 echo ""
 echo -e "FINAL SUMMARY:\n$STATS_LOG"
 echo ""
