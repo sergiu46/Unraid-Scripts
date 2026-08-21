@@ -14,7 +14,7 @@
 # CF_API_TOKEN="YOUR_TOKEN"
 # ZONE_ID="YOUR_ZONE_ID"
 # DOMAIN="example.com"
-# TUNNEL="your-id.cfargotunnel.com"
+# TUNNEL="your-tunnel-id"
 # PROXIED="false"
 #
 # # Behavior
@@ -45,6 +45,14 @@ IP_CACHE="$CACHE_DIR/${SAFE_NAME}.ip"
 mkdir -p "$CACHE_DIR"
 
 # PRE-FLIGHT CHECKS
+if [ -n "$TUNNEL" ]; then
+    TUNNEL=$(echo "$TUNNEL" | tr -d '[:space:]')
+    if [[ "$TUNNEL" != *cfargotunnel.com* ]]; then
+        TUNNEL="${TUNNEL%%.*}"
+        TUNNEL="${TUNNEL}.cfargotunnel.com"
+    fi
+fi
+
 if ! command -v jq &> /dev/null || ! command -v traceroute &> /dev/null; then
     echo "❌ Error: 'jq' or 'traceroute' is not installed."
     exit 1
