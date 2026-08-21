@@ -45,14 +45,6 @@ IP_CACHE="$CACHE_DIR/${SAFE_NAME}.ip"
 mkdir -p "$CACHE_DIR"
 
 # PRE-FLIGHT CHECKS
-if [ -n "$TUNNEL" ]; then
-    TUNNEL=$(echo "$TUNNEL" | tr -d '[:space:]')
-    if [[ "$TUNNEL" != *cfargotunnel.com* ]]; then
-        TUNNEL="${TUNNEL%%.*}"
-        TUNNEL="${TUNNEL}.cfargotunnel.com"
-    fi
-fi
-
 if ! command -v jq &> /dev/null || ! command -v traceroute &> /dev/null; then
     echo "❌ Error: 'jq' or 'traceroute' is not installed."
     exit 1
@@ -162,6 +154,13 @@ main() {
     IFS='|' read -r CF_ID CF_TYPE CF_CONTENT CF_PROXIED <<< "$(get_cloudflare_state)"
 
     if [ "$CHANGE_DNS_RECORDS" = "true" ] && is_cgnat "$CURRENT_IP"; then
+        if [ -n "$TUNNEL" ]; then
+            TUNNEL=$(echo "$TUNNEL" | tr -d '[:space:]')
+            if [[ "$TUNNEL" != *cfargotunnel.com* ]]; then
+                TUNNEL="${TUNNEL%%.*}"
+                TUNNEL="${TUNNEL}.cfargotunnel.com"
+            fi
+        fi
         REQ_TYPE="CNAME"; REQ_CONTENT="$TUNNEL"; REQ_PROXY="true"
         echo "🔒 Mode: CGNAT (CNAME required)"
     else
