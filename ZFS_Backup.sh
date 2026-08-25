@@ -175,9 +175,9 @@ if [[ "${RESTORE_MODE:-}" == "yes" ]]; then
     echo "Restoring from: $RESTORE_FROM"
     echo "----------------------------------------------------"
 
-    # Verificare de siguranță: Previne eroarea "Dataset is busy"
-    if /etc/rc.d/rc.docker status | grep -q "running" || /etc/rc.d/rc.libvirt status | grep -q "running"; then
-        echo "❌ EROARE: Serviciile Docker sau Libvirt rulează."
+    # Verificare directă de procese: previne fals-pozitivele din string-urile "not running"
+    if pgrep -x "dockerd" >/dev/null || pgrep -x "libvirtd" >/dev/null; then
+        echo "❌ EROARE: Serviciile Docker sau Libvirt rulează în fundal."
         echo "Trebuie oprite complet din setările Unraid înainte de a restaura 'appdata' sau 'system'."
         exit 1
     fi
