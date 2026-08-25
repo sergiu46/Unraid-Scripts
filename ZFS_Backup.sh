@@ -7,7 +7,6 @@
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 
-
 # #!/bin/bash
 #
 # SOURCE_POOL="cache"
@@ -23,6 +22,10 @@
 # DEST_PARENT_REMOTE="remote_pool/offsite_backups"
 # REMOTE_USER="root"
 # REMOTE_HOST="192.168.1.50"
+#
+# # --- RESTORE VARIABLES (Uncomment to execute a restore) ---
+# # RESTORE_MODE="yes"
+# # RESTORE_FROM="local" # Options: "local" or "remote"
 #
 # # ---------------------------------------------------------
 # # Sanoid Retention Policy Defaults
@@ -63,7 +66,6 @@
 # { echo "❌ Script already running"; exit 1; }
 # source "$DIR/ZFS_Backup.sh"
 
-
 ##################################################################
 
 #!/bin/bash
@@ -79,7 +81,6 @@ LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
 if [ "$DEBUG" != "true" ] && [ -f "$LOG_FILE" ]; then
     : > "$LOG_FILE"
 fi
-
 
 # FUNCTIONS
 
@@ -161,6 +162,46 @@ replicate_with_repair() {
     fi
     return 0
 }
+
+# --- RESTORE LOGIC ---
+if [[ "${RESTORE_MODE:-}" == "yes" ]]; then
+    if [[ -z "${RESTORE_FROM:-}" ]]; then
+        echo "❌ RESTORE_MODE is 'yes' but RESTORE_FROM is not defined. Aborting."
+        exit 1
+    fi
+    
+    echo "----------------------------------------------------"
+    echo "⚠️ ZFS RESTORE INITIATED at $(date +'%H:%M:%S - %d.%m.%Y')"
+    echo "Restoring from: $RESTORE_FROM"
+    echo "----------------------------------------------------"
+
+    # Verificare de siguranță: Previne eroarea "Dataset is busy"
+    if /etc/rc.d/rc.docker status | grep -q "running" || /etc/rc.d/rc.libvirt status | grep -q "running"; then
+        echo "❌ EROARE: Serviciile Docker sau Libvirt rulează."
+        echo "Trebuie oprite complet din setările Unraid înainte de a restaura 'appdata' sau 'system'."
+        exit 1
+    fi
+
+    for DS in "${DATASETS[@]}"; do
+        SRC_DS="${SOURCE_POOL}/${DS}"
+        echo "🔄 Restoring dataset: $DS to $SRC_DS"
+
+        # Utilizare --recvoptions="F" pentru a forța zfs receive să șteargă starea locală divergentă
+        if [[ "$RESTORE_FROM" == "local" ]]; then
+            BACKUP_DS="${DEST_PARENT_LOCAL}/${DS}"
+            /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "$BACKUP_DS" "$SRC_DS"
+            
+        elif [[ "$RESTORE_FROM" == "remote" ]]; then
+            BACKUP_DS="${DEST_PARENT_REMOTE}/${DS}"
+            /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "${REMOTE_USER}@${REMOTE_HOST}:${BACKUP_DS}" "$SRC_DS"
+        fi
+    done
+    
+    echo "----------------------------------------------------"
+    echo "✅ Restore completed. Script exiting."
+    unraid_notify "ZFS Restore Complete" "Data restored from $RESTORE_FROM" "normal" "🟢" "Restore finished successfully!"
+    exit 0
+fi
 
 # MAIN EXECUTION
 echo "----------------------------------------------------"
