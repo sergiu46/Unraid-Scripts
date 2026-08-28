@@ -74,7 +74,7 @@ EOF
 chmod 0644 "$LR_CONF"
 logrotate -s "$LR_STATE" "$LR_CONF"
 
-echo "-------------------------------------------------------"
+echo ""
 echo "🧹 Log Cleanup (Files older than $PURGE_DAYS days since last write)"
 echo ""
 
