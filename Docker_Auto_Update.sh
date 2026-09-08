@@ -8,7 +8,6 @@
 #
 # --- COPY THIS TO UNRAID USER SCRIPTS ---
 
-
 # #!/bin/bash
 #
 # # Config
@@ -18,7 +17,6 @@
 # )
 #
 # DELAY_DAYS=5
-# REMOVE_SKIPPED_IMAGE="true"
 # PRUNE_DANGLING="true"
 # NOTIFICATION_TYPE="all" # "all", "updated", "error", or "none"
 #
@@ -35,13 +33,18 @@
 # { echo "❌ Download Failed"; exit 1; }
 # source "$DIR/Docker_Auto_Update.sh"
 
-
 # --- END COPY ---
 #
 # ==============================================================================
 
 #!/bin/bash
 
+# ==============================================================================
+# GLOBAL VARIABLES & CONFIGURATION
+# ==============================================================================
+DIR="${DIR:-/dev/shm/docker_auto_update}"
+REGCTL_BIN="$DIR/regctl"
+REGCTL_URL="https://github.com/regclient/regclient/releases/latest/download/regctl-linux-amd64"
 UNRAID_UPDATE_SCRIPT="/usr/local/emhttp/plugins/dynamix.docker.manager/scripts/update_container"
 REMOVE_SKIPPED_IMAGE="${REMOVE_SKIPPED_IMAGE:-true}"
 PRUNE_DANGLING="${PRUNE_DANGLING:-true}"
@@ -56,12 +59,6 @@ UPDATED_LIST=()
 SKIPPED_LIST=()
 ERROR_LIST=()
 
-# Clean logs
-SCRIPT_NAME=$(basename "$(dirname "$0")")
-LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
-if [ "$DEBUG" != "true" ] && [ -f "$LOG_FILE" ]; then
-    : > "$LOG_FILE"
-fi
 
 # FUNCTIONS
 unraid_notify() {
@@ -82,13 +79,26 @@ contains_element() {
     return 1
 }
 
+# ==============================================================================
 # MAIN EXECUTION
+# ==============================================================================
+
 echo "----------------------------------------------------"
 echo ""
 echo "🚀 Start Docker updates check (Release >= ${DELAY_DAYS:-3} days)"
 echo ""
 echo "----------------------------------------------------"
 
+# Ensure regctl binary exists in the specified DIR
+if [ ! -x "$REGCTL_BIN" ]; then
+    echo "⏳ Downloading regctl binary to $DIR..."
+    mkdir -p "$DIR"
+    curl -sSL "$REGCTL_URL" -o "$REGCTL_BIN" && chmod +x "$REGCTL_BIN"
+    if [ $? -ne 0 ]; then
+        echo "❌ [ERROR] Failed to download regctl binary."
+        exit 1
+    fi
+fi
 
 NOW_SEC=$(date +%s)
 CONTAINERS=$(docker ps --format '{{.Names}}')
@@ -101,26 +111,32 @@ for CONTAINER in $CONTAINERS; do
     fi
 
     IMAGE=$(docker inspect --format '{{.Config.Image}}' "$CONTAINER")
-    CURRENT_ID=$(docker inspect --format '{{.Image}}' "$CONTAINER")
+    
+    LOCAL_IMAGE_ID=$(docker inspect --format '{{.Image}}' "$CONTAINER")
+    LOCAL_CREATED=$(docker inspect --format '{{.Created}}' "$LOCAL_IMAGE_ID" 2>/dev/null | tr -d '\r\n"')
+    
+    # Extract exact 19 characters (YYYY-MM-DDTHH:MM:SS), replace T with space, append UTC
+    LOCAL_CLEAN=$(echo "$LOCAL_CREATED" | cut -c 1-19 | tr 'T' ' ')
+    LOCAL_SEC=$(date -d "$LOCAL_CLEAN UTC" +%s 2>/dev/null)
 
-    # Silently pull the latest version of the image
-    docker pull "$IMAGE" > /dev/null 2>&1
-    LATEST_ID=$(docker image inspect --format '{{.Id}}' "$IMAGE" 2>/dev/null)
+    # Check remote image date using binary inside DIR
+    REMOTE_CREATED=$("$REGCTL_BIN" image inspect "$IMAGE" --format '{{.Created}}' 2>/dev/null | tr -d '\r\n"')
 
-    if [ -z "$LATEST_ID" ]; then
-        echo "❌ [ERROR]    $CONTAINER - Could not verify the image."
+    if [ -z "$REMOTE_CREATED" ]; then
+        echo "❌ [ERROR]    $CONTAINER - Could not verify the remote image."
         ((ERROR_COUNT++))
-        ERROR_LIST+=("$CONTAINER (Verification failed)")
+        ERROR_LIST+=("$CONTAINER (Remote verification failed)")
         continue
     fi
 
-    # Check if there is a new version different from the current one
-    if [ "$CURRENT_ID" != "$LATEST_ID" ]; then
-        CREATED_DATE=$(docker image inspect --format '{{.Created}}' "$LATEST_ID")
-        CREATED_SEC=$(date -d "$CREATED_DATE" +%s 2>/dev/null)
+    # Extract exact 19 characters (YYYY-MM-DD HH:MM:SS), replace T with space, append UTC
+    REMOTE_CLEAN=$(echo "$REMOTE_CREATED" | cut -c 1-19 | tr 'T' ' ')
+    REMOTE_SEC=$(date -d "$REMOTE_CLEAN UTC" +%s 2>/dev/null)
 
-        if [ -n "$CREATED_SEC" ]; then
-            AGE_SEC=$((NOW_SEC - CREATED_SEC))
+    if [ -n "$REMOTE_SEC" ] && [ -n "$LOCAL_SEC" ]; then
+        # Check if remote image is newer than local image
+        if [ "$REMOTE_SEC" -gt "$LOCAL_SEC" ]; then
+            AGE_SEC=$((NOW_SEC - REMOTE_SEC))
             AGE_DAYS=$((AGE_SEC / 86400))
 
             if [ "$AGE_DAYS" -ge "${DELAY_DAYS:-3}" ]; then
@@ -137,20 +153,15 @@ for CONTAINER in $CONTAINERS; do
             else
                 ((SKIPPED_COUNT++))
                 SKIPPED_LIST+=("$CONTAINER ($AGE_DAYS/${DELAY_DAYS:-3} days)")
-                if [ "$REMOVE_SKIPPED_IMAGE" == "true" ]; then
-                    echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: ${DELAY_DAYS:-3} days). Removing image."
-                    docker image rm "$LATEST_ID" > /dev/null 2>&1
-                else
-                    echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: ${DELAY_DAYS:-3} days). Keeping image."
-                fi
+                echo "⏳ [SKIP]     $CONTAINER - New version available: $AGE_DAYS days (required: ${DELAY_DAYS:-3} days). Skipping download."
             fi
         else
-            echo "❌ [ERROR]    $CONTAINER - Could not calculate release date for $IMAGE."
-            ((ERROR_COUNT++))
-            ERROR_LIST+=("$CONTAINER (Date calculation failed)")
+            echo "✅ [OK]       $CONTAINER - Already running the latest version."
         fi
     else
-        echo "✅ [OK]       $CONTAINER - Already running the latest version."
+        echo "❌ [ERROR]    $CONTAINER - Date parsing failed. (Local: '$LOCAL_CREATED', Remote: '$REMOTE_CREATED')"
+        ((ERROR_COUNT++))
+        ERROR_LIST+=("$CONTAINER (Date calculation failed)")
     fi
 done
 
