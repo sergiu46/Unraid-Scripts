@@ -82,8 +82,7 @@ for FOLDER in $TARGET_PATHS; do
         echo "📂 Searching: $FOLDER"
         echo ""
         
-        # Using -mtime (Modification Time)
-        find "$FOLDER" -type f -mtime +"$PURGE_DAYS" \( -name "*.log" -o -name "*.log.*" -o -name "*.bak" \) -exec bash -c '
+        find "$FOLDER" -type f -mtime +"$PURGE_DAYS" \( -name "*.log" -o -name "*.log.*" -o -name "*.bak" -o -name "*.gz" -o -name "*.old" -o -name "*.[0-9]" \) -exec bash -c '
             for file do
                 # Use %y for last modification time instead of %x (access time)
                 ACC=$(stat -c "%y" "$file" | cut -d"." -f1)
