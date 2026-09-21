@@ -9,8 +9,10 @@
 
 # #!/bin/bash
 #
-# SOURCE_POOL="cache"
-# DATASETS=( "appdata" "system" )
+# # Use SOURCE_POOLS for multiple pools, or SOURCE_POOL for single pool
+# SOURCE_POOL="cache" 
+# SOURCE_POOLS=("cache" "flash") 
+# DATASETS=("appdata" "system" "boot")
 #
 # # Destinations
 # RUN_LOCAL="yes"
@@ -81,6 +83,12 @@ LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
 if [ "$DEBUG" != "true" ] && [ -f "$LOG_FILE" ]; then
     : > "$LOG_FILE"
 fi
+
+# SETUP POOLS ARRAY FOR BACKWARD COMPATIBILITY
+declare -a CHECK_POOLS
+if [[ -n "${SOURCE_POOL:-}" ]]; then CHECK_POOLS+=("$SOURCE_POOL"); fi
+if declare -p SOURCE_POOLS >/dev/null 2>&1; then CHECK_POOLS+=("${SOURCE_POOLS[@]}"); fi
+readarray -t UNIQUE_POOLS < <(printf '%s\n' "${CHECK_POOLS[@]}" | sort -u)
 
 # FUNCTIONS
 
@@ -183,18 +191,23 @@ if [[ "${RESTORE_MODE:-}" == "yes" ]]; then
     fi
 
     for DS in "${DATASETS[@]}"; do
-        SRC_DS="${SOURCE_POOL}/${DS}"
-        echo "🔄 Restoring dataset: $DS to $SRC_DS"
-
-        # Utilizare --recvoptions="F" pentru a forța zfs receive să șteargă starea locală divergentă
-        if [[ "$RESTORE_FROM" == "local" ]]; then
-            BACKUP_DS="${DEST_PARENT_LOCAL}/${DS}"
-            /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "$BACKUP_DS" "$SRC_DS"
+        for P in "${UNIQUE_POOLS[@]}"; do
+            SRC_DS="${P}/${DS}"
             
-        elif [[ "$RESTORE_FROM" == "remote" ]]; then
-            BACKUP_DS="${DEST_PARENT_REMOTE}/${DS}"
-            /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "${REMOTE_USER}@${REMOTE_HOST}:${BACKUP_DS}" "$SRC_DS"
-        fi
+            if zfs list -H -o name "$SRC_DS" >/dev/null 2>&1; then
+                echo "🔄 Restoring dataset: $DS to $SRC_DS"
+
+                # Utilizare --recvoptions="F" pentru a forța zfs receive să șteargă starea locală divergentă
+                if [[ "$RESTORE_FROM" == "local" ]]; then
+                    BACKUP_DS="${DEST_PARENT_LOCAL}/${DS}"
+                    /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "$BACKUP_DS" "$SRC_DS"
+                    
+                elif [[ "$RESTORE_FROM" == "remote" ]]; then
+                    BACKUP_DS="${DEST_PARENT_REMOTE}/${DS}"
+                    /usr/local/sbin/syncoid -r --no-sync-snap --force-delete --recvoptions="F" "${REMOTE_USER}@${REMOTE_HOST}:${BACKUP_DS}" "$SRC_DS"
+                fi
+            fi
+        done
     done
     
     echo "----------------------------------------------------"
@@ -210,142 +223,147 @@ echo "🛠️ ZFS Backup Started at $(date +'%H:%M:%S - %d.%m.%Y')"
 echo ""
 
 for DS in "${DATASETS[@]}"; do
-    SRC_DS="${SOURCE_POOL}/${DS}"
-    TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
-    MANUAL_SNAP="manual_sync_$TIMESTAMP"
-    
-    echo "----------------------------------------------------"
-    echo "📦 Dataset: $SRC_DS"
+    for P in "${UNIQUE_POOLS[@]}"; do
+        SRC_DS="${P}/${DS}"
+        
+        if zfs list -H -o name "$SRC_DS" >/dev/null 2>&1; then
+            TIMESTAMP=$(date +%Y-%m-%d_%H%M%S)
+            MANUAL_SNAP="manual_sync_$TIMESTAMP"
+            
+            echo "----------------------------------------------------"
+            echo "📦 Dataset: $SRC_DS"
 
-    # 1. Take snapshot
-    zfs snapshot -r "$SRC_DS@$MANUAL_SNAP" && echo "📸 Manual snapshot created: $MANUAL_SNAP"
-    echo ""
-    local_stat=0; remote_stat=0
-
-    # 2. Local Backup Logic
-    if [[ "$RUN_LOCAL" == "yes" ]]; then
-        if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
-            echo "⏭️  Skipping Local (Excluded)"
+            # 1. Take snapshot
+            zfs snapshot -r "$SRC_DS@$MANUAL_SNAP" && echo "📸 Manual snapshot created: $MANUAL_SNAP"
             echo ""
-            local_stat=2
-        else
-            LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
-            if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
-                echo "✅ Local sync successful!"
-                echo ""
-                local_stat=1
-                DST_RAM_LOCAL="$DIR/dst_local_${DS//\//_}"
-                create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL" "LOCAL"
-                /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
-                rm -rf "$DST_RAM_LOCAL"
+            local_stat=0; remote_stat=0
+
+            # 2. Local Backup Logic
+            if [[ "$RUN_LOCAL" == "yes" ]]; then
+                if contains_element "$DS" "${EXCLUDE_LOCAL[@]}"; then
+                    echo "⏭️  Skipping Local (Excluded)"
+                    echo ""
+                    local_stat=2
+                else
+                    LOCAL_DS="${DEST_PARENT_LOCAL}/${DS}"
+                    if replicate_with_repair "local" "$SRC_DS" "$DEST_PARENT_LOCAL" "$DS"; then
+                        echo "✅ Local sync successful!"
+                        echo ""
+                        local_stat=1
+                        DST_RAM_LOCAL="$DIR/dst_local_${DS//\//_}"
+                        create_sanoid_config "$LOCAL_DS" "$DST_RAM_LOCAL" "LOCAL"
+                        /usr/local/sbin/sanoid --configdir "$DST_RAM_LOCAL" --prune-snapshots
+                        rm -rf "$DST_RAM_LOCAL"
+                    else
+                        local_stat=3
+                    fi
+                fi
+            fi
+
+            # 3. Remote Backup Logic
+            if [[ "$RUN_REMOTE" == "yes" ]]; then
+                if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
+                    echo "⏭️  Skipping Remote (Excluded)."
+                    echo ""
+                    remote_stat=2
+                else
+                    REMOTE_DS="${DEST_PARENT_REMOTE}/${DS}"
+                    if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
+                        echo "✅ Remote sync successful!"
+                        echo ""
+                        remote_stat=1
+                        
+                        # --- UNIQUE HOST CONFIG LOGIC ---
+                        echo "🧹 Pruning snapshots on remote host..."
+                        MY_HOSTNAME=$(hostname)
+                        
+                        # Local temp folder inside your $DIR variable
+                        LOCAL_SANOID_TEMP="$DIR/sanoid_remote_${DS//\//_}"
+                        # Remote temp folder inside /tmp with hostname to prevent collisions
+                        REMOTE_SANOID_TEMP="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
+
+                        # Generate config locally first
+                        create_sanoid_config "$REMOTE_DS" "$LOCAL_SANOID_TEMP" "REMOTE"
+                        
+                        # Push to unique remote path and prune
+                        ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_SANOID_TEMP"
+                        scp "$LOCAL_SANOID_TEMP/"* "${REMOTE_USER}@${REMOTE_HOST}:$REMOTE_SANOID_TEMP/"
+                        ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir $REMOTE_SANOID_TEMP --prune-snapshots"
+                        
+                        # Cleanup both sides
+                        ssh "${REMOTE_USER}@${REMOTE_HOST}" "rm -rf $REMOTE_SANOID_TEMP"
+                        rm -rf "$LOCAL_SANOID_TEMP"
+                    else
+                        remote_stat=3
+                    fi
+                fi
+            fi
+
+            # 4. Result Text Mapping
+            case $local_stat in
+                1) L_RES="✅ Success" ;;
+                2) L_RES="⏭️ Skipped" ;;
+                3) L_RES="❌ Failed"  ;;
+                *) L_RES="➖ Disabled" ;;
+            esac
+
+            case $remote_stat in
+                1) R_RES="✅ Success" ;;
+                2) R_RES="⏭️ Skipped" ;;
+                3) R_RES="❌ Failed"  ;;
+                *) R_RES="➖ Disabled" ;;
+            esac
+            
+            # 5. Build Multi-line Card Summary
+            SUMMARY_LOG+="\n📦 Dataset: $SRC_DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
+
+            # 6. Source Maintenance & Rotation
+            if [[ $local_stat -eq 3 || $remote_stat -eq 3 ]]; then
+                ((FAILURE_TOTAL++))
+            fi
+
+            if [[ ("$RUN_LOCAL" != "yes" && "$RUN_REMOTE" != "yes") || ($local_stat -eq 1 || $remote_stat -eq 1) ]]; then
+                if [[ $local_stat -ne 3 && $remote_stat -ne 3 ]]; then
+                    ((SUCCESS_TOTAL++))
+                fi
+                
+                # Calculate Manual Retention Fallbacks for all three locations independently
+                GEN_M="KEEP_MANUAL"
+                
+                SPEC_SM="KEEP_SOURCE_MANUAL"
+                VAL_SM="${!SPEC_SM}"; [[ -z "$VAL_SM" ]] && VAL_SM="${!GEN_M}"; VAL_SM="${VAL_SM:-2}"
+
+                SPEC_LM="KEEP_LOCAL_MANUAL"
+                VAL_LM="${!SPEC_LM}"; [[ -z "$VAL_LM" ]] && VAL_LM="${!GEN_M}"; VAL_LM="${VAL_LM:-2}"
+
+                SPEC_RM="KEEP_REMOTE_MANUAL"
+                VAL_RM="${!SPEC_RM}"; [[ -z "$VAL_RM" ]] && VAL_RM="${!GEN_M}"; VAL_RM="${VAL_RM:-2}"
+
+                # Sanoid Maintenance for Source (Now cleanly decoupled using SOURCE rules)
+                SRC_RAM="$DIR/src_${SRC_DS//\//_}"
+                create_sanoid_config "$SRC_DS" "$SRC_RAM" "SOURCE"
+                /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
+                rm -rf "$SRC_RAM"
+                
+                echo "🧹 Pruning manual snapshots locally..."
+
+                # Always rotate Source using SOURCE settings
+                zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_SM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+                
+                # Rotate Local destination using LOCAL settings
+                if [[ $local_stat -eq 1 ]]; then
+                    zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
+                fi
+
+                # Rotate Remote destination using REMOTE settings
+                if [[ $remote_stat -eq 1 ]]; then
+                    ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((VAL_RM + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
+                fi
             else
-                local_stat=3
+                echo "❌ Backup completely failed. Skipping rotation to preserve history."
             fi
         fi
-    fi
-
-    # 3. Remote Backup Logic
-    if [[ "$RUN_REMOTE" == "yes" ]]; then
-        if contains_element "$DS" "${EXCLUDE_REMOTE[@]}"; then
-            echo "⏭️  Skipping Remote (Excluded)."
-            echo ""
-            remote_stat=2
-        else
-            REMOTE_DS="${DEST_PARENT_REMOTE}/${DS}"
-            if replicate_with_repair "remote" "$SRC_DS" "$DEST_PARENT_REMOTE" "$DS"; then
-                echo "✅ Remote sync successful!"
-                echo ""
-                remote_stat=1
-                
-                # --- UNIQUE HOST CONFIG LOGIC ---
-                echo "🧹 Pruning snapshots on remote host..."
-                MY_HOSTNAME=$(hostname)
-                
-                # Local temp folder inside your $DIR variable
-                LOCAL_SANOID_TEMP="$DIR/sanoid_remote_${DS//\//_}"
-                # Remote temp folder inside /tmp with hostname to prevent collisions
-                REMOTE_SANOID_TEMP="/tmp/sanoid_${MY_HOSTNAME}_${DS//\//_}"
-
-                # Generate config locally first
-                create_sanoid_config "$REMOTE_DS" "$LOCAL_SANOID_TEMP" "REMOTE"
-                
-                # Push to unique remote path and prune
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "mkdir -p $REMOTE_SANOID_TEMP"
-                scp "$LOCAL_SANOID_TEMP/"* "${REMOTE_USER}@${REMOTE_HOST}:$REMOTE_SANOID_TEMP/"
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "/usr/local/sbin/sanoid --configdir $REMOTE_SANOID_TEMP --prune-snapshots"
-                
-                # Cleanup both sides
-                ssh "${REMOTE_USER}@${REMOTE_HOST}" "rm -rf $REMOTE_SANOID_TEMP"
-                rm -rf "$LOCAL_SANOID_TEMP"
-            else
-                remote_stat=3
-            fi
-        fi
-    fi
-
-    # 4. Result Text Mapping
-    case $local_stat in
-        1) L_RES="✅ Success" ;;
-        2) L_RES="⏭️ Skipped" ;;
-        3) L_RES="❌ Failed"  ;;
-        *) L_RES="➖ Disabled" ;;
-    esac
-
-    case $remote_stat in
-        1) R_RES="✅ Success" ;;
-        2) R_RES="⏭️ Skipped" ;;
-        3) R_RES="❌ Failed"  ;;
-        *) R_RES="➖ Disabled" ;;
-    esac
-    
-    # 5. Build Multi-line Card Summary
-    SUMMARY_LOG+="\n📦 Dataset: $DS\n↳ 💾 Local: $L_RES\n↳ ☁️ Remote: $R_RES\n"
-
-    # 6. Source Maintenance & Rotation
-    if [[ $local_stat -eq 3 || $remote_stat -eq 3 ]]; then
-        ((FAILURE_TOTAL++))
-    fi
-
-    if [[ ("$RUN_LOCAL" != "yes" && "$RUN_REMOTE" != "yes") || ($local_stat -eq 1 || $remote_stat -eq 1) ]]; then
-        if [[ $local_stat -ne 3 && $remote_stat -ne 3 ]]; then
-            ((SUCCESS_TOTAL++))
-        fi
-        
-        # Calculate Manual Retention Fallbacks for all three locations independently
-        GEN_M="KEEP_MANUAL"
-        
-        SPEC_SM="KEEP_SOURCE_MANUAL"
-        VAL_SM="${!SPEC_SM}"; [[ -z "$VAL_SM" ]] && VAL_SM="${!GEN_M}"; VAL_SM="${VAL_SM:-2}"
-
-        SPEC_LM="KEEP_LOCAL_MANUAL"
-        VAL_LM="${!SPEC_LM}"; [[ -z "$VAL_LM" ]] && VAL_LM="${!GEN_M}"; VAL_LM="${VAL_LM:-2}"
-
-        SPEC_RM="KEEP_REMOTE_MANUAL"
-        VAL_RM="${!SPEC_RM}"; [[ -z "$VAL_RM" ]] && VAL_RM="${!GEN_M}"; VAL_RM="${VAL_RM:-2}"
-
-        # Sanoid Maintenance for Source (Now cleanly decoupled using SOURCE rules)
-        SRC_RAM="$DIR/src_${SRC_DS//\//_}"
-        create_sanoid_config "$SRC_DS" "$SRC_RAM" "SOURCE"
-        /usr/local/sbin/sanoid --configdir "$SRC_RAM" --take-snapshots --prune-snapshots 
-        rm -rf "$SRC_RAM"
-        
-        echo "🧹 Pruning manual snapshots locally..."
-
-        # Always rotate Source using SOURCE settings
-        zfs list -H -t snapshot -o name -S creation "$SRC_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_SM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
-        
-        # Rotate Local destination using LOCAL settings
-        if [[ $local_stat -eq 1 ]]; then
-            zfs list -H -t snapshot -o name -S creation "$LOCAL_DS" | grep "@" | grep -v "@autosnap_" | tail -n +$((VAL_LM + 1)) | xargs -I {} zfs destroy -r {} 2>/dev/null
-        fi
-
-        # Rotate Remote destination using REMOTE settings
-        if [[ $remote_stat -eq 1 ]]; then
-            ssh "${REMOTE_USER}@${REMOTE_HOST}" "zfs list -H -t snapshot -o name -S creation '$REMOTE_DS' | grep '@' | grep -v '@autosnap_' | tail -n +$((VAL_RM + 1)) | xargs -I {} zfs destroy -r {}" 2>/dev/null
-        fi
-    else
-        echo "❌ Backup completely failed. Skipping rotation to preserve history."
-    fi
+    done
 done
 
 # FINAL REPORT
