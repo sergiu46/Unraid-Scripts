@@ -77,6 +77,11 @@ FAILED=0
 PERM_FIXED=0
 SUMMARY_LOG=""
 
+# Errors from find/chown/chmod are collected here (shown only when DEBUG="true")
+ERR_FILE="${DIR:-/dev/shm/Nextcloud_Maintenance}/perm_errors.txt"
+mkdir -p "$(dirname "$ERR_FILE")"
+: > "$ERR_FILE"
+
 # Clean Logs
 SCRIPT_NAME=$(basename "$(dirname "$0")")
 LOG_FILE="/tmp/user.scripts/tmpScripts/$SCRIPT_NAME/log.txt"
@@ -103,9 +108,23 @@ occ() {
     docker exec -u "$OWNER_UID" "$CONTAINER" php /var/www/html/occ "$@"
 }
 
+# Number of non-empty lines in $1
+count_lines() {
+    [ -z "$1" ] && { echo 0; return; }
+    printf '%s\n' "$1" | wc -l
+}
+
+# DEBUG only: print every changed item (old mode, old uid:gid, path)
+debug_list() {
+    if [ "$DEBUG" = "true" ] && [ -n "$1" ]; then
+        printf '%s\n' "$1" | sed 's/^/      • /'
+    fi
+    return 0
+}
+
 # Only changes what is wrong. $1 = folder, $2 = dir mode, $3 = file mode
 fix_tree() {
-    local d="$1" dm="$2" fm="$3" n_own n_dir n_file
+    local d="$1" dm="$2" fm="$3" l_own l_dir l_file n_own n_dir n_file
 
     if [ ! -d "$d" ]; then
         echo "⚠️  Missing folder: $d"
@@ -116,15 +135,22 @@ fix_tree() {
 
     echo "📂 Checking: $d"
 
-    n_own=$(find "$d" \( ! -uid "$OWNER_UID" -o ! -gid "$OWNER_GID" \) -print -exec chown -h "$OWNER_UID:$OWNER_GID" {} + 2>/dev/null | wc -l)
+    # -printf runs before the batched chown/chmod, so it shows the OLD values
+    l_own=$(find "$d" \( ! -uid "$OWNER_UID" -o ! -gid "$OWNER_GID" \) -printf '%m %U:%G %p\n' -exec chown -h "$OWNER_UID:$OWNER_GID" {} + 2>>"$ERR_FILE")
+    n_own=$(count_lines "$l_own")
     echo "   👤 Owner fixed on $n_own item(s)"
+    debug_list "$l_own"
 
-    n_dir=$(find "$d" -type d ! -perm "$dm" -print -exec chmod "$dm" {} + 2>/dev/null | wc -l)
+    l_dir=$(find "$d" -type d ! -perm "$dm" -printf '%m %U:%G %p\n' -exec chmod "$dm" {} + 2>>"$ERR_FILE")
+    n_dir=$(count_lines "$l_dir")
     echo "   📁 Directory mode fixed on $n_dir item(s)"
+    debug_list "$l_dir"
 
     # config.php is kept private (640) further below, so it is skipped here
-    n_file=$(find "$d" -type f ! -perm "$fm" ! \( -path "$d/config.php" -o -path "$d/config/config.php" \) -print -exec chmod "$fm" {} + 2>/dev/null | wc -l)
+    l_file=$(find "$d" -type f ! -perm "$fm" ! \( -path "$d/config.php" -o -path "$d/config/config.php" \) -printf '%m %U:%G %p\n' -exec chmod "$fm" {} + 2>>"$ERR_FILE")
+    n_file=$(count_lines "$l_file")
     echo "   📄 File mode fixed on $n_file item(s)"
+    debug_list "$l_file"
 
     PERM_FIXED=$((PERM_FIXED + n_own + n_dir + n_file))
     echo ""
@@ -168,6 +194,7 @@ echo "----------------------------------------------------"
 
 # 1. Permissions
 echo "🔐 Checking ownership and permissions..."
+[ "$DEBUG" = "true" ] && echo "🐞 DEBUG: changed items are listed as: <old mode> <old uid:gid> <path>"
 echo ""
 
 for FOLDER in "${APP_DIRS[@]}"; do
@@ -177,7 +204,13 @@ done
 # config.php contains the database password: keep it private
 for FOLDER in "${APP_DIRS[@]}"; do
     [ -d "$FOLDER" ] || continue
-    find "$FOLDER" -maxdepth 2 -name config.php ! -perm 640 -exec chmod 640 {} + 2>/dev/null
+    L_CFG=$(find "$FOLDER" -maxdepth 2 -name config.php ! -perm 640 -printf '%m %U:%G %p\n' -exec chmod 640 {} + 2>>"$ERR_FILE")
+    if [ -n "$L_CFG" ]; then
+        N_CFG=$(count_lines "$L_CFG")
+        echo "🔒 config.php set to 640 in $FOLDER ($N_CFG item(s))"
+        debug_list "$L_CFG"
+        PERM_FIXED=$((PERM_FIXED + N_CFG))
+    fi
 done
 
 if [ "$FIX_DATA" = 1 ]; then
@@ -190,6 +223,15 @@ if [ "$FIX_DATA" = 1 ]; then
 fi
 SUMMARY_LOG+="\n🔐 Permissions\n↳ ✅ $PERM_FIXED item(s) fixed\n"
 
+# Errors hidden so far (e.g. permission denied, files vanished during the run)
+if [ -s "$ERR_FILE" ]; then
+    echo "⚠️  $(wc -l < "$ERR_FILE") error(s) while fixing permissions (set DEBUG=\"true\" to see them)"
+    if [ "$DEBUG" = "true" ]; then
+        echo "🐞 DEBUG: permission errors:"
+        sed 's/^/      ! /' "$ERR_FILE"
+    fi
+fi
+
 # 2. Check that Nextcloud answers
 echo "----------------------------------------------------"
 echo "🌐 Checking container '$CONTAINER'..."
@@ -197,8 +239,13 @@ echo "🌐 Checking container '$CONTAINER'..."
 if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" != "true" ]; then
     abort "Container '$CONTAINER' is not running - skipping database maintenance and scan." "Container is not running."
 fi
-if ! occ status >/dev/null 2>&1; then
+if ! OCC_STATUS=$(occ status 2>&1); then
+    [ "$DEBUG" = "true" ] && { echo "🐞 DEBUG: occ status output:"; echo "$OCC_STATUS"; }
     abort "occ does not respond - skipping database maintenance and scan. Check: docker logs $CONTAINER" "occ does not respond."
+fi
+if [ "$DEBUG" = "true" ]; then
+    echo "🐞 DEBUG: occ status:"
+    echo "$OCC_STATUS" | sed 's/^/      /'
 fi
 if occ status --output=json 2>/dev/null | grep -Eq '"maintenance":[[:space:]]*true'; then
     abort "Maintenance mode is on (update running?) - skipping database maintenance and scan." "Nextcloud is in maintenance mode."
