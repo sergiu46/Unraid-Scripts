@@ -27,6 +27,10 @@
 # # Host folder with the user files (mounted at /var/www/html/data).
 # DATA_DIR="/mnt/user/Nextcloud"
 #
+# # Files whose mode Nextcloud sets itself (skipped by the file-mode fix).
+# # Nextcloud creates its log as 640, so without this it would flip every run.
+# PERM_EXCLUDE=( "nextcloud.log*" )
+#
 # # Tasks. "1" = run, "0" = skip.
 # FIX_DATA=1          # Check data folder permissions (dirs 770, files 660)
 # DB_MAINTENANCE=1    # Add missing columns/indices/primary keys, bigint conversion
@@ -63,6 +67,10 @@ FIX_DATA="${FIX_DATA:-1}"
 DB_MAINTENANCE="${DB_MAINTENANCE:-1}"
 SCAN_FILES="${SCAN_FILES:-1}"
 NOTIFY_LEVEL="${NOTIFY_LEVEL:-error}"
+
+if [ ${#PERM_EXCLUDE[@]} -eq 0 ]; then
+    PERM_EXCLUDE=( "nextcloud.log*" )
+fi
 
 if [ ${#APP_DIRS[@]} -eq 0 ]; then
     APP_DIRS=(
@@ -124,7 +132,11 @@ debug_list() {
 
 # Only changes what is wrong. $1 = folder, $2 = dir mode, $3 = file mode
 fix_tree() {
-    local d="$1" dm="$2" fm="$3" l_own l_dir l_file n_own n_dir n_file
+    local d="$1" dm="$2" fm="$3" l_own l_dir l_file n_own n_dir n_file pat
+    local excl=()
+
+    # Files in PERM_EXCLUDE keep the mode Nextcloud gave them (owner is still checked)
+    for pat in "${PERM_EXCLUDE[@]}"; do excl+=( ! -name "$pat" ); done
 
     if [ ! -d "$d" ]; then
         echo "⚠️  Missing folder: $d"
@@ -147,7 +159,7 @@ fix_tree() {
     debug_list "$l_dir"
 
     # config.php is kept private (640) further below, so it is skipped here
-    l_file=$(find "$d" -type f ! -perm "$fm" ! \( -path "$d/config.php" -o -path "$d/config/config.php" \) -printf '%m %U:%G %p\n' -exec chmod "$fm" {} + 2>>"$ERR_FILE")
+    l_file=$(find "$d" -type f ! -perm "$fm" "${excl[@]}" ! \( -path "$d/config.php" -o -path "$d/config/config.php" \) -printf '%m %U:%G %p\n' -exec chmod "$fm" {} + 2>>"$ERR_FILE")
     n_file=$(count_lines "$l_file")
     echo "   📄 File mode fixed on $n_file item(s)"
     debug_list "$l_file"
