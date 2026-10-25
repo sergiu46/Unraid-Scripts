@@ -105,7 +105,7 @@ for FOLDER in "${LOCAL_FOLDERS[@]}"; do
     echo ""
     
     # Mirror the local folder to the remote base directory
-    rsync -av --delete --timeout=30 "$FOLDER" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
+    rsync -av --insecure-links --rsync-path="rsync --insecure-links" --delete --timeout=30 "$FOLDER" "$REMOTE_USER@$REMOTE_HOST":"$REMOTE_BASE_DIR/"
     
     if [ $? -eq 0 ]; then
         echo ""
