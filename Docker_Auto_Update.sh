@@ -12,8 +12,8 @@
 #
 # # Config
 # EXCLUDE_CONTAINERS=(
-#     "example_container_1"
-#     "example_container_2"
+#      "example_container_1"
+#      "example_container_2"
 # )
 #
 # DELAY_DAYS=5
@@ -119,11 +119,14 @@ for CONTAINER in $CONTAINERS; do
     LOCAL_CLEAN=$(echo "$LOCAL_CREATED" | cut -c 1-19 | tr 'T' ' ')
     LOCAL_SEC=$(date -d "$LOCAL_CLEAN UTC" +%s 2>/dev/null)
 
-    # Check remote image date using binary inside DIR
-    REMOTE_CREATED=$("$REGCTL_BIN" image inspect "$IMAGE" --format '{{.Created}}' 2>/dev/null | tr -d '\r\n"')
+    # Check remote image date using binary inside DIR (capturing stderr for debugging)
+    REGCTL_ERR_FILE=$(mktemp)
+    REMOTE_CREATED=$("$REGCTL_BIN" image inspect "$IMAGE" --format '{{.Created}}' 2> "$REGCTL_ERR_FILE" | tr -d '\r\n"')
+    REGCTL_ERR_MSG=$(cat "$REGCTL_ERR_FILE" | tr -d '\r\n')
+    rm -f "$REGCTL_ERR_FILE"
 
     if [ -z "$REMOTE_CREATED" ]; then
-        echo "❌ [ERROR]    $CONTAINER - Could not verify the remote image."
+        echo "❌ [ERROR]    $CONTAINER - Could not verify remote image. Reason: ${REGCTL_ERR_MSG:-Unknown error}"
         ((ERROR_COUNT++))
         ERROR_LIST+=("$CONTAINER (Remote verification failed)")
         continue
