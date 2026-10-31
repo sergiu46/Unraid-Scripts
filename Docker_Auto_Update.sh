@@ -119,14 +119,31 @@ for CONTAINER in $CONTAINERS; do
     LOCAL_CLEAN=$(echo "$LOCAL_CREATED" | cut -c 1-19 | tr 'T' ' ')
     LOCAL_SEC=$(date -d "$LOCAL_CLEAN UTC" +%s 2>/dev/null)
 
-    # Check remote image date using binary inside DIR (capturing stderr for debugging)
-    REGCTL_ERR_FILE=$(mktemp)
-    REMOTE_CREATED=$("$REGCTL_BIN" image inspect "$IMAGE" --format '{{.Created}}' 2> "$REGCTL_ERR_FILE" | tr -d '\r\n"')
-    REGCTL_ERR_MSG=$(cat "$REGCTL_ERR_FILE" | tr -d '\r\n')
-    rm -f "$REGCTL_ERR_FILE"
+    # Check remote image date using regctl with retry loop (3 attempts, 5s delay)
+    MAX_RETRIES=3
+    RETRY_DELAY=5
+    ATTEMPT=1
+    REMOTE_CREATED=""
+    REGCTL_ERR_MSG=""
+
+    while [ $ATTEMPT -le $MAX_RETRIES ]; do
+        REGCTL_ERR_FILE=$(mktemp)
+        REMOTE_CREATED=$("$REGCTL_BIN" image inspect "$IMAGE" --format '{{.Created}}' 2> "$REGCTL_ERR_FILE" | tr -d '\r\n"')
+        REGCTL_ERR_MSG=$(cat "$REGCTL_ERR_FILE" | tr -d '\r\n')
+        rm -f "$REGCTL_ERR_FILE"
+
+        if [ -n "$REMOTE_CREATED" ]; then
+            break
+        fi
+
+        if [ $ATTEMPT -lt $MAX_RETRIES ]; then
+            sleep "$RETRY_DELAY"
+        fi
+        ((ATTEMPT++))
+    done
 
     if [ -z "$REMOTE_CREATED" ]; then
-        echo "❌ [ERROR]    $CONTAINER - Could not verify remote image. Reason: ${REGCTL_ERR_MSG:-Unknown error}"
+        echo "❌ [ERROR]    $CONTAINER - Could not verify remote image after $MAX_RETRIES attempts. Reason: ${REGCTL_ERR_MSG:-Unknown error}"
         ((ERROR_COUNT++))
         ERROR_LIST+=("$CONTAINER (Remote verification failed)")
         continue
