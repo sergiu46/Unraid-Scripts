@@ -183,6 +183,9 @@ for CONTAINER in $CONTAINERS; do
         ((ERROR_COUNT++))
         ERROR_LIST+=("$CONTAINER (Date calculation failed)")
     fi
+
+    # Brief pause between containers to prevent rate-limiting registries (e.g., lscr.io / GHCR)
+    sleep 1
 done
 
 if [ "$PRUNE_DANGLING" == "true" ]; then
