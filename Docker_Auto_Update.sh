@@ -100,6 +100,11 @@ if [ ! -x "$REGCTL_BIN" ]; then
     fi
 fi
 
+# Add a random startup jitter (5-15 seconds) to avoid colliding with Unraid cron tasks
+JITTER=$(( ( RANDOM % 11 ) + 5 ))
+echo "⏳ Waiting ${JITTER}s startup jitter to clear concurrent registry traffic..."
+sleep "$JITTER"
+
 NOW_SEC=$(date +%s)
 CONTAINERS=$(docker ps --format '{{.Names}}')
 
